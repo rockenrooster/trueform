@@ -229,3 +229,47 @@ library and settings; `scripts/test.ps1` now keeps the APKs installed. A test ru
 - Not done (needs the owner or time with the phones untouched): the 8-hour and Bluetooth/cast soaks, the CPU run
   with the screen off (the owner asked to keep the screens on), TalkBack and 200 % font passes, the Fire tablet
   no-Cast check, the 12R measurements (the 12R was not connected during this session).
+
+## Follow-up — owner requests, Chromecast on a receiver, layouts, power (2026-11-20, later)
+
+Owner requests:
+
+- **Waveform seekbar redesigned** ("looks terrible"): one layer instead of thin bars under a faint peak layer;
+  rounded symmetric bars by default ("Smooth" outline as the alternative); the played part takes a tone colour from
+  the spectral balance, blended only between neighbouring colours (warm, gold, cyan) in Oklab so it never turns
+  grey-brown; the unplayed part is a calm neutral; tips fade slightly; a slim rounded playhead with a soft glow; thin
+  bars on the mini player's bottom edge. Checked on the Moto in dark and light themes.
+- **"Lock to portrait"** (Look and feel, off by default).
+
+Chromecast, on one of the household's Cast speakers (screenless, idle; our stream at volume 0 before anything played;
+the owner asked for decisions, not questions):
+
+- Connect from the route button; the transfer loaded the queue paused at the phone's position; wake and Wi-Fi locks
+  held; the receiver fetched the FLAC from the phone's server (range seeks, then the stream).
+- Play, next, seek work on the receiver. An EQ change reloads the receiver at the same position with the rendered
+  WAV (`/r/<id>.wav`). Per-output EQ: the speaker keeps its own EQ profile, so later sessions to it render.
+- Process death while casting: the receiver plays on what it has (about 2.5 minutes, until it needs the next track
+  from the phone's server). **The restarted app does not re-attach**: the Cast framework keeps its saved session
+  ("googlecast-savedSessionState") but did not resume it, even with the framework started in `onCreate` and a 30 s
+  discovery scan with the framework's own selector after a session left open. Choosing the speaker again starts a
+  new session at the saved position. Recorded as a limit.
+- Not done: the Wi-Fi blip (switching Wi-Fi is a phone-wide setting) and the 3-hour cast soak (it would occupy a
+  household speaker for hours).
+
+Layouts (the owner asked for the Moto and the 12R only; the tablet was asleep at its lock screen, so the tablet size
+was simulated on the Moto with debug commands that rotate and rescale only this app):
+
+- Phone on its side: it got the tablet's side panel, whose controls fell off the bottom; now it gets the
+  side-by-side full player, and content keeps clear of a side navigation bar and the camera cutout.
+- Tablet size (1500 × 675 dp): library and player panel side by side; the panel's artwork shrinks so the controls fit.
+
+Power (release build, Moto, screen off, FLAC 16/44.1 with the 10-band EQ, CPU ticks from `/proc/<pid>/stat` over
+120 s): **7.6 % of one core** before; most of it on ExoPlayer's playback thread (EQ and the 10 ms work loop),
+decoding itself is small (loader thread). ExoPlayer's dynamic scheduling is now on (the thread sleeps until the
+audio output needs data); result below.
+
+Bluetooth: off on the Moto (switching it on is a phone-wide setting); not tested. Android Auto: installed on the
+Moto, but testing needs its developer settings changed (the owner's call); the browse tree is covered by
+`LibraryTreeTest`.
+
+The 12R stayed unreachable all session (no wireless debugging advertised on the network).
