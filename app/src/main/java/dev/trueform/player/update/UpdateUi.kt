@@ -66,29 +66,30 @@ object UpdateUi {
                 return@Column
             }
             T("%.1f MB · playback stops while the update installs".format(r.apkSize / 1e6), Tf.type.caption, c.textSecondary)
-            when (val st = s) {
-                is UpdateState.Downloading -> {
-                    T("Downloading… ${(st.fraction * 100).toInt()}%", Tf.type.label)
-                    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(c.surface3)) {
-                        Box(Modifier.fillMaxWidth(st.fraction).height(6.dp).background(c.accent))
+            val st = s
+            if (st is UpdateState.Downloading) {
+                T("Downloading… ${(st.fraction * 100).toInt()}%", Tf.type.label)
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(c.surface3)) {
+                    Box(Modifier.fillMaxWidth(st.fraction).height(6.dp).background(c.accent))
+                }
+            }
+            if (st is UpdateState.Failed) T("Not installed: ${st.reason}", Tf.type.caption, c.danger, maxLines = 3)
+            // the action and the link in one row, above the notes: long notes never push them off the sheet
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                when (st) {
+                    is UpdateState.Downloading -> Unit
+                    is UpdateState.Ready -> PillButton("Install", null, primary = true) {
+                        context.activity()?.let { Installer.install(it, st.file) }
                     }
+                    is UpdateState.Failed -> PillButton("Try again", null, primary = true) { g.updater.download(r) }
+                    else -> PillButton("Download and install", null, primary = true) { g.updater.download(r) }
                 }
-                is UpdateState.Ready -> PillButton("Install", null, primary = true) {
-                    context.activity()?.let { Installer.install(it, st.file) }
-                }
-                is UpdateState.Failed -> {
-                    T("Not installed: ${st.reason}", Tf.type.caption, c.danger, maxLines = 3)
-                    PillButton("Try again", null, primary = true) { g.updater.download(r) }
-                }
-                else -> PillButton("Download and install", null, primary = true) { g.updater.download(r) }
-            }
-            Box(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
-                T(notesText(r.notes), Tf.type.body, c.textSecondary, maxLines = Int.MAX_VALUE)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 TextBtn("View on GitHub") {
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.pageUrl))) }
                 }
+            }
+            Box(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+                T(notesText(r.notes), Tf.type.body, c.textSecondary, maxLines = Int.MAX_VALUE)
             }
         }
     }

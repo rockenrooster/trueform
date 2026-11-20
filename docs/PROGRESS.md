@@ -174,3 +174,54 @@ library and settings; `scripts/test.ps1` now keeps the APKs installed. A test ru
   the owner asked for testing on the Moto and the 12R, and rotating a shared phone changes a device-wide setting.
 - Backup rules: settings, EQ state and presets are backed up; the library, waveforms, artwork and logs are rebuilt.
 - Debug command `set` (any stored setting by key) for scripted checks.
+
+## M10 — Releases and the updater (2026-11-20)
+
+- Public repository: https://github.com/rockenrooster/trueform (created with the owner's standing go-ahead to decide).
+  Before the first push the history was checked for keys, passwords, device serials and personal data; the
+  development history (which named the test phones' serials in this file) stayed on a local branch, and the public
+  history starts from one commit.
+- Release key: made by `scripts/release-key.ps1` with a random password that was never displayed; it is stored
+  DPAPI-encrypted next to the keystore in `keys/` (gitignored). Certificate SHA-256
+  `9c165d32fe95e6e78f1433a38dae8094f0e5e00f0f8b4b7d55793aa7f8ea0a0c`. **The owner should back up the keystore and
+  the password** (`scripts\release-key.ps1 -ShowPassword`).
+- Workflow: cold run (FFmpeg built) 5 min 44 s; warm runs about 4 minutes. APK 9.3 MB (budget 15 MB).
+  First run failed: AGP 9 has no `testReleaseUnitTest`; the workflow runs `testDebugUnitTest`.
+- Exit checks on the Moto:
+  - build 2 downloaded with `gh release download`, checksum checked, installed on a phone that never had the release
+    app; onboarding, folder choice and scan worked in the R8 build;
+  - after build 3 was published, returning to the library showed "Update · build 3"; the sheet showed the notes; the
+    download, the SHA-256, package, signer and version checks passed. **The install did not start**: inside the bottom
+    sheet `LocalContext` is a `ContextWrapper`, not the activity. Fixed in build 4 (builds 2 and 3 cannot update
+    themselves; nobody but the test phone has them).
+  - build 2 → build 4 as an update (`adb install -r`): queue, position and the "Bass boost" EQ were intact;
+  - build 4 → build 5 in the app: the pill, the sheet, the download and all checks, then Android's "Install unknown
+    apps" page for Trueform opened as designed. That switch is a security setting, so it was left for the owner:
+    switch it on once, go back, tap Install, confirm Android's prompt. **The last step (Android's own confirmation and
+    the restart into build 5) is not verified.** Data survival across an update was checked with build 2 → 4 above.
+  - The sheet's "View on GitHub" sat under the navigation bar when the notes were long: the actions now share one
+    row above the notes (build 6).
+- Release manifest review: not debuggable, no debug receiver; exported components are the activity, the playback
+  service, the artwork provider and the Bluetooth receiver (disabled until its setting is on), plus library
+  components: Media3's media button receiver and Bluetooth validation activity, AndroidX's profile installer.
+
+## M11 — Hardening (2026-11-20)
+
+- Crash capture: `filesDir/last-crash.txt` with the stack trace and one line of player state; the next start offers
+  "Share report" once. StrictMode in debug builds (log only).
+- StrictMode findings: about 0.5 s of main-thread disk work when the player is created (the Cast framework's
+  start-up, the saved queue, the database). The Play services check, the database open and the queue file read now
+  start on the IO dispatcher at app start; the Cast framework's own initialisation (about 0.45 s on the Moto, after
+  the first frame) remains. Moving it would mean creating the cast player after the session (Media3 allows
+  `session.player = …`); left as a finding.
+- Cold start (debug build, Moto, `am start -W`): 1.66–1.74 s to the first frame (budget 1.5 s for a release build;
+  the release build was not measured separately).
+- Hostile library (`scripts/make-hostile-library.sh`, 20,029 files, on the Moto): walk 42.8 s, tags 99.6 s; empty,
+  truncated and non-audio files are logged and skipped, no crash; a 20 MB cover, invalid tag bytes, a 400-word title,
+  a 240-byte file name, a 384 kHz FLAC (played at the 192 kHz cap) and a two-hour Opus file (seek to 1:59:50) all
+  play. Memory after this run (debug build, 20,000-track library): 215 MB PSS.
+- Waveform: 384 kHz 8 s in 337 ms, MP3 10 s in 195 ms, two-hour Opus (sampled) in 2.5 s; extrapolated 4-minute FLAC
+  about 2.9 s and MP3 about 4.7 s on the Moto (budgets 4 s and 7 s).
+- Not done (needs the owner or time with the phones untouched): the 8-hour and Bluetooth/cast soaks, the CPU sample
+  with the screen off (the owner asked to keep the screens on), TalkBack and 200 % font passes, the Fire tablet
+  no-Cast check, the 12R measurements (the 12R was not connected during this session).
