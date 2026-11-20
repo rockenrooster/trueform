@@ -59,7 +59,7 @@ object UpdateUi {
         val s by g.updater.state.collectAsState()
         val r = releaseOf(s)
         // "Download and install": the installer starts as soon as the verified file is there
-        LaunchedEffect(s) { (s as? UpdateState.Ready)?.let { ready -> (context as? Activity)?.let { Installer.install(it, ready.file) } } }
+        LaunchedEffect(s) { (s as? UpdateState.Ready)?.let { ready -> context.activity()?.let { Installer.install(it, ready.file) } } }
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             T(r?.title ?: "Updates", Tf.type.title)
             if (r == null) {
@@ -67,9 +67,6 @@ object UpdateUi {
                 return@Column
             }
             T("%.1f MB · playback stops while the update installs".format(r.apkSize / 1e6), Tf.type.caption, c.textSecondary)
-            Box(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-                T(notesText(r.notes), Tf.type.body, c.textSecondary, maxLines = Int.MAX_VALUE)
-            }
             when (val st = s) {
                 is UpdateState.Downloading -> {
                     T("Downloading… ${(st.fraction * 100).toInt()}%", Tf.type.label)
@@ -78,13 +75,16 @@ object UpdateUi {
                     }
                 }
                 is UpdateState.Ready -> PillButton("Install", null, primary = true) {
-                    (context as? Activity)?.let { Installer.install(it, st.file) }
+                    context.activity()?.let { Installer.install(it, st.file) }
                 }
                 is UpdateState.Failed -> {
                     T("Not installed: ${st.reason}", Tf.type.caption, c.danger, maxLines = 3)
                     PillButton("Try again", null, primary = true) { g.updater.download(r) }
                 }
                 else -> PillButton("Download and install", null, primary = true) { g.updater.download(r) }
+            }
+            Box(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
+                T(notesText(r.notes), Tf.type.body, c.textSecondary, maxLines = Int.MAX_VALUE)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 TextBtn("View on GitHub") {
@@ -109,6 +109,13 @@ object UpdateUi {
             }
         }
         return true
+    }
+
+    /** A sheet's LocalContext is a wrapper around the activity, not the activity itself. */
+    private tailrec fun android.content.Context.activity(): Activity? = when (this) {
+        is Activity -> this
+        is android.content.ContextWrapper -> baseContext.activity()
+        else -> null
     }
 
     private fun releaseOf(s: UpdateState): Release? = when (s) {
