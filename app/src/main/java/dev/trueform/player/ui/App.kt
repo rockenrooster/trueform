@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
@@ -216,11 +220,12 @@ private fun Main(g: AppGraph) {
         )
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // a phone on its side puts the navigation bar (and a camera cutout) at the side: keep content out of it
+    BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         val fullPx = with(LocalDensity.current) { maxHeight.toPx() }
         // Wide screens (tablets, docked or landscape): the library and a player panel that stays open (04-ui-ux.md)
         val panel = minOf(480.dp, maxWidth * 0.42f)
-        val wide = maxWidth >= 840.dp && ui.hasMedia && ui.track != null
+        val wide = maxWidth >= 840.dp && maxHeight >= 600.dp && ui.hasMedia && ui.track != null   // not a phone on its side
         Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Box(Modifier.weight(1f)) {

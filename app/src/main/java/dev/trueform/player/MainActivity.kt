@@ -35,7 +35,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         needsSetup = !hasAudioPermission(this) || rootsMissing()
         setContent {
-            AppRoot(g, needsSetup, onSetupDone = { needsSetup = false }, requestPermission = { permission.launch(audioPermission()) })
+            val content = @androidx.compose.runtime.Composable {
+                AppRoot(g, needsSetup, onSetupDone = { needsSetup = false }, requestPermission = { permission.launch(audioPermission()) })
+            }
+            val dd = debugDensity
+            if (dd == null) content()
+            else androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dd, 1f), content = content)
         }
         handleOpenWith(intent)
         lifecycleScope.launch {
@@ -44,6 +50,12 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch { g.settings.flow(S.watchMusic).collect { g.watchMediaStore(it && hasAudioPermission(this@MainActivity)) } }
+        lifecycleScope.launch {   // "Lock to portrait"; off: follow the phone's own rotation setting
+            g.settings.flow(S.lockPortrait).collect { lock ->
+                requestedOrientation = if (lock) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
         if (hasAudioPermission(this) && !needsSetup && g.settings[S.scanOnStart]) g.scanner.request()
         if (g.settings[S.playOnOpen]) lifecycleScope.launch { g.controller(); if (g.corePlayer.mediaItemCount > 0) { g.corePlayer.prepare(); g.corePlayer.play() } }
     }
@@ -56,6 +68,19 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         g.controller()   // binds the playback service: the session and its notification exist while we may play
+    }
+
+    override fun onResume() {
+        super.onResume()
+        current = java.lang.ref.WeakReference(this)
+    }
+
+    companion object {
+        /** The visible activity, for the debug build's "orient" command (rotates this app only, not the phone). */
+        var current: java.lang.ref.WeakReference<MainActivity>? = null
+
+        /** The debug build's "density" command: draws this app at another density, to see the tablet layout on a phone. */
+        var debugDensity by mutableStateOf<Float?>(null)
     }
 
     private fun rootsMissing(): Boolean = g.library.scanRoots().isEmpty()

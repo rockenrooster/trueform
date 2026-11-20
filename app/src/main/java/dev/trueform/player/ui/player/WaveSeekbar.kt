@@ -18,11 +18,17 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -36,6 +42,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -49,15 +56,14 @@ import dev.trueform.player.ui.theme.LocalHaptics
 import dev.trueform.player.ui.theme.Tf
 import dev.trueform.player.waveform.WaveformData
 import dev.trueform.player.waveform.WaveformRepo
-import dev.trueform.player.waveform.WaveformTuning
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.pow
 
 /**
- * The Trueform seekbar (docs/plan/05-waveform-seekbar.md T2, T3): bar height is loudness, colour is the balance of
- * bass, mids and treble, the played part is bright. The bars are drawn once into a bitmap per size and style; each
- * frame only the played/unplayed clip moves. Tap seeks, drag scrubs (seek on release).
+ * The Trueform seekbar (docs/plan/05-waveform-seekbar.md T2, T3). The track as one smooth mirrored outline (or rounded
+ * bars): its height is loudness, the played part is coloured by the music's tone (warm where bass leads, gold in the
+ * mids, cyan where treble leads), the rest is a quiet neutral. Both are drawn once into bitmaps per size and style;
+ * each frame only the boundary moves. Tap seeks, drag scrubs (seek on release).
  */
 @Composable
 fun WaveSeekbar(
@@ -69,7 +75,7 @@ fun WaveSeekbar(
     modifier: Modifier = Modifier,
     height: Dp = 80.dp,
     detail: WaveDetail = WaveDetail.FINE,
-    shape: WaveShape = WaveShape.MIRRORED,
+    shape: WaveShape = WaveShape.BARS,
     colorMode: WaveColor = WaveColor.SPECTRAL,
     accent: Color = Tf.colors.accent,
     seekWhileDragging: Boolean = false,
@@ -85,7 +91,8 @@ fun WaveSeekbar(
     var lastLiveSeek by remember { mutableStateOf(0L) }
     val dur by rememberUpdatedState(durationMs)
     val seek by rememberUpdatedState(onSeek)
-    val low = c.waveLow; val mid = c.waveMid; val high = c.waveHigh
+    val palette = Palette(c.waveLow, c.waveMid, c.waveHigh, accent, c.text.copy(alpha = if (c.isDark) 0.20f else 0.17f),
+        colorMode == WaveColor.ACCENT)
     val text = c.text
 
     val gestures = if (compact) Modifier else Modifier
@@ -126,63 +133,38 @@ fun WaveSeekbar(
             .drawWithCache {
                 val w = size.width.toInt().coerceAtLeast(1)
                 val h = size.height.toInt().coerceAtLeast(1)
-                val barW = with(density) { (if (compact) 3.dp else detail.bar.dp).toPx() }
-                val gap = with(density) { (if (compact) 2.dp else detail.gap.dp).toPx() }
-                val bitmap: ImageBitmap? = data?.let { d ->
-                    ImageBitmap(w, h).also { img ->
-                        CanvasDrawScope().draw(density, LayoutDirection.Ltr, Canvas(img), Size(w.toFloat(), h.toFloat())) {
-                            val count = ((w + gap) / (barW + gap)).toInt().coerceAtLeast(1)
-                            val mirrored = shape == WaveShape.MIRRORED && !compact
-                            val base = if (mirrored) h * 0.62f else h.toFloat()
-                            val up = base - 2f
-                            val down = h - base - 2f
-                            val cols = WaveformData.COLUMNS
-                            for (i in 0 until count) {
-                                val c0 = i * cols / count
-                                val c1 = max(c0 + 1, (i + 1) * cols / count)
-                                if (c1 > d.filled) break
-                                var rms = 0f; var peak = -60f; var lo = 0f; var mi = 0f; var hi = 0f
-                                for (k in c0 until c1) {
-                                    rms += d.rmsDb(k); peak = max(peak, d.peakDb(k)); lo += d.lo(k); mi += d.mid(k); hi += d.hi(k)
-                                }
-                                val n = (c1 - c0).toFloat()
-                                val body = WaveformRepo.height(rms / n) * up
-                                val tip = WaveformRepo.height(peak) * up
-                                val color = if (colorMode == WaveColor.ACCENT) accent else mix(low, mid, high, lo / n, mi / n, hi / n)
-                                val x = i * (barW + gap)
-                                val r = CornerRadius(barW / 2, barW / 2)
-                                drawRoundRect(color.copy(alpha = 0.35f), Offset(x, base - tip), Size(barW, tip), r)
-                                drawRoundRect(color, Offset(x, base - body), Size(barW, body), r)
-                                if (mirrored) {
-                                    val refl = body * 0.6f * (down / (up * 0.6f)).coerceAtMost(1f)
-                                    drawRoundRect(color.copy(alpha = 0.45f), Offset(x, base + 1.5f), Size(barW, refl), r)
-                                }
-                            }
-                        }
-                    }
-                }
+                val bars = shape == WaveShape.BARS && !compact
+                val played = data?.let { render(it, w, h, density, played = true, bars, compact, detail, palette) }
+                val rest = data?.let { render(it, w, h, density, played = false, bars, compact, detail, palette) }
+                val cy = if (compact) size.height else size.height / 2
+                val half = if (compact) size.height else size.height / 2 - 1.dp.toPx()
                 onDrawBehind {
                     @Suppress("UNUSED_EXPRESSION") frame   // redraw every frame while playing
                     val p = position()
                     val x = dragX ?: if (durationMs > 0) (p.toFloat() / durationMs * size.width) else 0f
-                    if (bitmap != null) {
-                        clipRect(right = x) { drawImage(bitmap, alpha = if (compact) 0.9f else 1f) }
-                        clipRect(left = x) { drawImage(bitmap, alpha = if (compact) 0.35f else 0.38f) }
-                    } else {
-                        val y = size.height * (if (compact) 0.98f else 0.62f)
-                        drawLine(text.copy(alpha = 0.18f), Offset(0f, y), Offset(size.width, y), 2.dp.toPx())
-                        drawLine(text.copy(alpha = 0.7f), Offset(0f, y), Offset(x, y), 2.dp.toPx())
+                    if (played != null && rest != null) {
+                        clipRect(right = x) { drawImage(played) }
+                        clipRect(left = x) { drawImage(rest) }
+                    } else {   // not analysed yet: a quiet line with the progress on it
+                        val y = if (compact) size.height - 1.dp.toPx() else cy
+                        drawLine(palette.rest, Offset(0f, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round)
+                        drawLine(accent, Offset(0f, y), Offset(x, y), 2.dp.toPx(), StrokeCap.Round)
                     }
                     if (!compact) {
-                        drawRect(text, Offset(x - 1.dp.toPx(), 0f), Size(2.dp.toPx(), size.height))
+                        val px = x.coerceIn(1.5.dp.toPx(), size.width - 1.5.dp.toPx())
+                        val top = cy - half - 2.dp.toPx()
+                        val bottom = cy + half + 2.dp.toPx()
+                        drawLine(accent.copy(alpha = 0.28f), Offset(px, top), Offset(px, bottom), 7.dp.toPx(), StrokeCap.Round)
+                        drawLine(text, Offset(px, top), Offset(px, bottom), 2.dp.toPx(), StrokeCap.Round)
                         dragX?.let { dx ->
-                            drawCircle(text, 6.dp.toPx(), Offset(dx, size.height * 0.62f))
+                            drawCircle(accent.copy(alpha = 0.35f), 12.dp.toPx(), Offset(dx, cy))
+                            drawCircle(text, 6.dp.toPx(), Offset(dx, cy))
                             val target = (dx / size.width * durationMs).toLong()
                             val delta = target - p
                             val label = formatDuration(target) + "  ·  " + (if (delta >= 0) "+" else "−") + formatDuration(abs(delta))
-                            val layout = measurer.measure(label, TextStyle(fontFamily = InterFamily, fontSize = 12.sp, color = text, fontFeatureSettings = "tnum"))
+                            val layout = measurer.measure(label, TextStyle(fontFamily = InterFamily, fontSize = 12.sp, color = Color.White, fontFeatureSettings = "tnum"))
                             val lx = (dx - layout.size.width / 2f).coerceIn(0f, size.width - layout.size.width)
-                            drawRoundRect(Color.Black.copy(alpha = 0.6f), Offset(lx - 8.dp.toPx(), -layout.size.height - 10.dp.toPx()),
+                            drawRoundRect(Color.Black.copy(alpha = 0.72f), Offset(lx - 8.dp.toPx(), -layout.size.height - 10.dp.toPx()),
                                 Size(layout.size.width + 16.dp.toPx(), layout.size.height + 8.dp.toPx()), CornerRadius(8.dp.toPx()))
                             drawText(layout, topLeft = Offset(lx, -layout.size.height - 6.dp.toPx()))
                         }
@@ -192,6 +174,126 @@ fun WaveSeekbar(
     )
 }
 
+/** The colours: the tone gradient (or the accent) for the played part, a neutral for the rest. */
+private class Palette(val low: Color, val mid: Color, val high: Color, val accent: Color, val rest: Color, val accentOnly: Boolean) {
+    /** 0 = bass leads, 0.5 = mids, 1 = treble; blended between neighbours only (Oklab), so never a muddy grey. */
+    fun tone(t: Float): Color = when {
+        accentOnly -> accent
+        t < 0.5f -> lerp(low, mid, (t / 0.5f).coerceIn(0f, 1f))
+        else -> lerp(mid, high, ((t - 0.5f) / 0.5f).coerceIn(0f, 1f))
+    }
+}
+
+/** Loudness (0..1) and tone (0..1) at [n] points across the track, lightly smoothed; fewer when analysis is partial. */
+private fun points(d: WaveformData, n: Int, smooth: Int): Pair<FloatArray, FloatArray> {
+    val cols = WaveformData.COLUMNS
+    val amp = FloatArray(n)
+    val tone = FloatArray(n)
+    var k = 0
+    for (i in 0 until n) {
+        val c0 = i * cols / n
+        val c1 = max(c0 + 1, (i + 1) * cols / n)
+        if (c1 > d.filled) break
+        var rms = 0f; var peak = -96f; var lo = 0f; var mi = 0f; var hi = 0f
+        for (j in c0 until c1) { rms += d.rmsDb(j); peak = max(peak, d.peakDb(j)); lo += d.lo(j); mi += d.mid(j); hi += d.hi(j) }
+        val m = (c1 - c0).toFloat()
+        // mostly RMS (what you hear), some peak (so drums and attacks show)
+        amp[i] = 0.7f * WaveformRepo.height(rms / m) + 0.3f * WaveformRepo.height(peak)
+        val s = lo + mi + hi
+        val centroid = if (s > 0f) (0.5f * mi + hi) / s else 0.5f
+        tone[i] = (0.5f + (centroid - 0.5f) * 1.5f).coerceIn(0f, 1f)   // music mostly leans low: widen the spread
+        k = i + 1
+    }
+    return blur(amp, k, smooth) to blur(tone, k, smooth + 4)
+}
+
+/** A [radius]-wide triangular moving average over the first [n] values (n is kept as the length). */
+private fun blur(v: FloatArray, n: Int, radius: Int): FloatArray {
+    if (radius <= 0 || n == 0) return v.copyOf(n)
+    val out = FloatArray(n)
+    for (i in 0 until n) {
+        var sum = 0f; var wsum = 0f
+        for (o in -radius..radius) {
+            val j = i + o
+            if (j < 0 || j >= n) continue
+            val wgt = (radius + 1 - abs(o)).toFloat()
+            sum += v[j] * wgt; wsum += wgt
+        }
+        out[i] = sum / wsum
+    }
+    return out
+}
+
+/** One bitmap of the whole track: the played look, or the unplayed one. */
+private fun render(d: WaveformData, w: Int, h: Int, density: Density, played: Boolean, bars: Boolean, compact: Boolean,
+                   detail: WaveDetail, palette: Palette): ImageBitmap {
+    val img = ImageBitmap(w, h)
+    CanvasDrawScope().draw(density, LayoutDirection.Ltr, Canvas(img), Size(w.toFloat(), h.toFloat())) {
+        val dp = density.density
+        if (bars || compact) {
+            // rounded bars: centred and mirrored in the player; thin and standing on the bottom edge in the mini player
+            val barW = (if (compact) 2f else detail.bar * 1.5f) * dp
+            val gap = (if (compact) 2f else detail.gap * 1.6f) * dp
+            val n = ((w + gap) / (barW + gap)).toInt().coerceIn(8, WaveformData.COLUMNS)
+            val (amp, tone) = points(d, n, smooth = 1)
+            for (i in amp.indices) {
+                val x = i * (barW + gap)
+                // the mini player draws the whole strip faint: its unplayed part needs a stronger grey to show at all
+                val color = if (played) palette.tone(tone[i]) else if (compact) palette.rest.copy(alpha = palette.rest.alpha * 2f) else palette.rest
+                val r = CornerRadius(barW / 2, barW / 2)
+                if (compact) {
+                    val hh = max(amp[i] * h * 0.75f, barW)
+                    drawRoundRect(color, Offset(x, h - hh), Size(barW, hh), r)
+                } else {
+                    val hh = max(amp[i] * (h / 2f - dp), barW / 2)
+                    drawRoundRect(color, Offset(x, h / 2f - hh), Size(barW, 2 * hh), r)
+                }
+            }
+        } else {
+            val step = (if (compact) 3f else 2f) * dp
+            val n = (w / step).toInt().coerceIn(16, WaveformData.COLUMNS)
+            val smooth = if (compact) 3 else when (detail) { WaveDetail.FINE -> 2; WaveDetail.MEDIUM -> 3; WaveDetail.BOLD -> 5 }
+            val (amp, tone) = points(d, n, smooth)
+            if (amp.isEmpty()) return@draw
+            val xs = FloatArray(amp.size) { i -> if (amp.size == 1) 0f else i * (w - 1f) / (n - 1) }
+            val path = if (compact) outline(xs, amp, base = h.toFloat(), half = h - dp, mirrored = false)
+            else outline(xs, amp, base = h / 2f, half = h / 2f - dp, mirrored = true)
+            val brush = if (!played) Brush.horizontalGradient(listOf(palette.rest, palette.rest))
+            else Brush.horizontalGradient(
+                colorStops = Array(amp.size) { i -> (xs[i] / w).coerceIn(0f, 1f) to palette.tone(tone[i]) },
+                startX = 0f, endX = w.toFloat())
+            drawPath(path, brush)
+        }
+        if (!compact) fadeEdges(h.toFloat())
+    }
+    return img
+}
+
+/** A smooth outline through the tops (and, mirrored, the bottoms) of the points, closed around the base line. */
+private fun outline(xs: FloatArray, amp: FloatArray, base: Float, half: Float, mirrored: Boolean): Path = Path().apply {
+    val n = amp.size
+    fun top(i: Int) = base - amp[i] * half
+    fun bottom(i: Int) = base + amp[i] * half
+    moveTo(xs[0], base)
+    lineTo(xs[0], top(0))
+    for (i in 1 until n) quadraticTo(xs[i - 1], top(i - 1), (xs[i - 1] + xs[i]) / 2, (top(i - 1) + top(i)) / 2)
+    lineTo(xs[n - 1], top(n - 1))
+    if (mirrored) {
+        lineTo(xs[n - 1], bottom(n - 1))
+        for (i in n - 2 downTo 0) quadraticTo(xs[i + 1], bottom(i + 1), (xs[i + 1] + xs[i]) / 2, (bottom(i + 1) + bottom(i)) / 2)
+        lineTo(xs[0], bottom(0))
+    } else {
+        lineTo(xs[n - 1], base)
+    }
+    close()
+}
+
+/** Depth: the tips fade a little towards the top and bottom, the middle stays full. */
+private fun DrawScope.fadeEdges(h: Float) {
+    drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.5f to Color.Black, 1f to Color.Black.copy(alpha = 0.55f),
+        startY = 0f, endY = h), blendMode = BlendMode.DstIn)
+}
+
 private fun spoken(ms: Long): String {
     val s = ms / 1000
     val m = s / 60
@@ -199,12 +301,3 @@ private fun spoken(ms: Long): String {
     return if (m > 0) "$m minute${if (m == 1L) "" else "s"} $r" else "$r seconds"
 }
 
-/** Weights sharpened by [WaveformTuning.SHARE_CONTRAST], mixed in linear RGB, so the dominant band sets the hue. */
-private fun mix(a: Color, b: Color, c: Color, wa: Float, wb: Float, wc: Float): Color {
-    val pa = wa.pow(WaveformTuning.SHARE_CONTRAST); val pb = wb.pow(WaveformTuning.SHARE_CONTRAST); val pc = wc.pow(WaveformTuning.SHARE_CONTRAST)
-    val s = (pa + pb + pc).takeIf { it > 0f } ?: 1f
-    fun lin(v: Float) = if (v <= 0.04045f) v / 12.92f else ((v + 0.055f) / 1.055f).pow(2.4f)
-    fun gam(v: Float) = if (v <= 0.0031308f) v * 12.92f else 1.055f * v.pow(1 / 2.4f) - 0.055f
-    fun ch(x: Float, y: Float, z: Float) = gam(((lin(x) * pa + lin(y) * pb + lin(z) * pc) / s).coerceIn(0f, 1f))
-    return Color(ch(a.red, b.red, c.red), ch(a.green, b.green, c.green), ch(a.blue, b.blue, c.blue))
-}

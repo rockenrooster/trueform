@@ -107,6 +107,12 @@ class DebugReceiver : BroadcastReceiver() {
                 Log.i(TAG, "bigqueue: worst next ${worst / 1_000_000} ms, window ${p.mediaItemCount}")
             }
             "die" -> android.os.Process.killProcess(android.os.Process.myPid())   // process death, as the system does it
+            "density" -> MainActivity.debugDensity = i.getStringExtra("v")?.toFloatOrNull()   // this app only; no value: normal
+            "orient" -> MainActivity.current?.get()?.requestedOrientation = when (i.getStringExtra("v")) {   // this app only
+                "land" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                "port" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
             "set" -> {   // --es key <setting key> --es value <value>: any stored setting (a Choice takes the enum name)
                 val key = i.getStringExtra("key")
                 val v = i.getStringExtra("value") ?: ""

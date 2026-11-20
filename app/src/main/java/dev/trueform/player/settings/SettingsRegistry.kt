@@ -31,7 +31,7 @@ enum class Density(val label: String) { COMFORTABLE("Comfortable"), COMPACT("Com
 enum class WaveDetail(val bar: Float, val gap: Float, val label: String) {
     FINE(2f, 1f, "Fine"), MEDIUM(3f, 1.5f, "Medium"), BOLD(4f, 2f, "Bold"),
 }
-enum class WaveShape(val label: String) { MIRRORED("Mirrored"), BARS("Bars") }
+enum class WaveShape(val label: String) { MIRRORED("Smooth"), BARS("Bars") }   // names stored; labels shown
 enum class WaveColor(val label: String) { SPECTRAL("Spectral"), ACCENT("Accent") }
 enum class CastQuality(val bits: Int, val maxRate: Int, val label: String) {
     HIGH(24, 96000, "24-bit up to 96 kHz"), COMPAT(16, 48000, "16-bit 48 kHz (compatibility)"),
@@ -86,6 +86,7 @@ object S {
 
     // Look and feel
     val theme = Choice("theme", ThemeMode.DARK, LOOK, "Theme", ThemeMode.entries, { it.label }, keywords = "dark light black amoled")
+    val lockPortrait = Toggle("lock_portrait", false, LOOK, "Lock to portrait", "Trueform stays upright when the phone turns", "rotation orientation landscape rotate")
     val artworkColors = Toggle("artwork_colors", true, LOOK, "Colour from artwork", "The player takes its colours from the album art", "color accent")
     val playerBackground = Choice("player_background", PlayerBackground.GRADIENT, LOOK, "Player background", PlayerBackground.entries, { it.label }, keywords = "blur")
     val density = Choice("density", Density.COMFORTABLE, LOOK, "List density", Density.entries, { it.label }, keywords = "compact rows")
@@ -94,7 +95,7 @@ object S {
     val swipeMini = Toggle("swipe_mini", true, LOOK, "Swipe the mini player to change track", keywords = "gesture next previous")
     val haptics = Toggle("haptics", true, LOOK, "Haptic feedback", keywords = "vibration")
     val waveDetail = Choice("wave_detail", WaveDetail.FINE, LOOK, "Waveform detail", WaveDetail.entries, { it.label }, keywords = "seekbar bars")
-    val waveShape = Choice("wave_shape", WaveShape.MIRRORED, LOOK, "Waveform shape", WaveShape.entries, { it.label }, keywords = "seekbar")
+    val waveShape = Choice("wave_shape", WaveShape.BARS, LOOK, "Waveform shape", WaveShape.entries, { it.label }, keywords = "seekbar")
     val waveColor = Choice("wave_color", WaveColor.SPECTRAL, LOOK, "Waveform colour", WaveColor.entries, { it.label }, keywords = "seekbar spectrum")
     val seekWhileDragging = Toggle("seek_while_dragging", false, LOOK, "Seek while dragging", "Hear the position while scrubbing the waveform", "scrub seekbar")
 
@@ -136,7 +137,7 @@ object S {
         outputRate, maxRate, resamplerQuality, audioBufferMs, replayGain, replayGainPreamp, untaggedPreamp, replayGainNoClip,
         limiter, limiterCeiling,
         openEqualizer, gainRange, accurateBands, eqPerOutput, outputProfiles, exportPresets, importPresets,
-        theme, artworkColors, playerBackground, density, showFileNames, swipeToQueue, swipeMini, haptics, waveDetail,
+        theme, lockPortrait, artworkColors, playerBackground, density, showFileNames, swipeToQueue, swipeMini, haptics, waveDetail,
         waveShape, waveColor, seekWhileDragging,
         castDsp, castQuality, castKeepAwake, castBattery, castResetKey, castLog,
         pauseOnDisconnect, resumeOnConnect, resumeOnlyIfPlaying, resumeDelayMs, notificationButtons,

@@ -269,10 +269,13 @@ fun NowPlaying(
                         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Center) { controls() }
                     }
                 } else {
+                    // as wide as the column allows, but never taller than what the controls (about 420 dp) leave
+                    val side = minOf((minOf(maxWidth, 560.dp) - 48.dp) * (if (wide) 0.7f else 1f), maxHeight - 420.dp)
+                        .coerceAtLeast(120.dp)
                     Column(Modifier.fillMaxHeight().widthIn(max = 560.dp).padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(Modifier.weight(0.4f))
-                        artwork(Modifier.fillMaxWidth(if (wide) 0.7f else 1f).aspectRatio(1f))
+                        artwork(Modifier.size(side))
                         Spacer(Modifier.weight(0.3f))
                         controls()
                     }
