@@ -62,8 +62,8 @@ jobs:
         if: steps.ffmpeg.outputs.cache-hit != 'true'
         run: NDK="$ANDROID_HOME/ndk/$TF_NDK" TF_FFMPEG_WORK="$RUNNER_TEMP/ffmpeg-work" bash scripts/build-ffmpeg.sh
 
-      - name: Unit tests
-        run: bash ./gradlew --no-daemon --console=plain :app:testReleaseUnitTest
+      - name: Unit tests (AGP 9 creates unit-test tasks for the debug build type only)
+        run: bash ./gradlew --no-daemon --console=plain :app:testDebugUnitTest
 
       - name: Build the release APK
         env:

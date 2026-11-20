@@ -85,7 +85,7 @@ jobs:
         if: steps.ffmpeg.outputs.cache-hit != 'true'
         run: NDK="$ANDROID_HOME/ndk/$TF_NDK" bash scripts/build-ffmpeg.sh
       - name: Unit tests
-        run: ./gradlew --no-daemon --console=plain :app:testReleaseUnitTest
+        run: ./gradlew --no-daemon --console=plain :app:testDebugUnitTest   # AGP 9: no release unit-test task
       - name: Build the release APK
         env:
           TF_KEYSTORE_BASE64: ${{ secrets.TF_KEYSTORE_BASE64 }}
