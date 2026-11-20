@@ -1,6 +1,6 @@
 # Trueform Music Player — notes for Claude sessions
 
-Android music player (Kotlin, Compose, Media3, FFmpeg). Status: implemented through M10; `docs/PROGRESS.md` says what was verified and what was not.
+Android music player (Kotlin, Compose, Media3, FFmpeg). Status: implemented through M11; `docs/PROGRESS.md` says what was verified and what was not. Scripted soaks: 15 minutes at most (the owner).
 
 **Start here:** `docs/plan/PLAN.md` (master plan, decisions, milestones), then the subplan of the current
 milestone in `docs/plan/`. `docs/design/mockup.html` is the visual reference. `docs/PROGRESS.md` (create it at M0)

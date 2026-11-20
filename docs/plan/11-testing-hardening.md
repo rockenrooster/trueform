@@ -76,8 +76,8 @@ owner. Measure before optimising.
 3. **Lifecycle torture** (our app in front only): rotate, split-screen, font scale change, theme change, process
    death with "Don't keep activities" left untouched (use `am kill` on our package while backgrounded), permission
    revoked while running (`pm revoke` on our package), storage removed.
-4. **Long runs**: local 8 hours on battery, screen off; Bluetooth 2 hours; cast 3 hours (M7's protocol) on two
-   phones.
+4. **Long runs**: the owner capped scripted soaks at 15 minutes (2026-11-20): run `scripts\soak.ps1 -Minutes 15`;
+   the hours-long runs (local 8 h on battery, Bluetooth 2 h, cast 3 h) are the owner's to run.
 5. **Hostile library**: a folder with 20,000 small files, zero-byte and truncated files, files with huge embedded
    art (20 MB), tags with invalid text, very long names, a two-hour file, a 384 kHz file, a DSD file.
 6. **Memory**: after an hour of browsing and playing, total PSS (`dumpsys meminfo <pkg>`) is stable (no growth of

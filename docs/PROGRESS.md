@@ -270,10 +270,21 @@ needs data): no measurable change (7.9 %). Debug build, warmed up, 60 s each: EQ
 off 2.8 %: the limiter's per-sample bookkeeping cost about 2 points even when it never acts. It now skips that work
 while nothing approaches the ceiling (bit-identical, JVM test): EQ + limiter 7.9 %, EQ off 4.1 %, both off 3.0 %.
 **The 3 % budget is still missed with the EQ on**: the 10-band cascade in Kotlin costs about 4 points on the Moto.
-The fix would be the filter cascade in C++ next to the decoder (NEON, double precision); not done in this session.
+The cascade now runs in C++ next to the decoder (left and right as the two lanes of an arm64 register, double
+precision), bit-identical to the Kotlin loop (DspNativeTest, max difference 0). One 100 ms buffer on the Moto: 10 bands
+at 44.1 kHz 0.88 ms in Kotlin, **0.25 ms** native (budget 0.5 ms); 31 bands at 192 kHz 3.4 ms, **2.7 ms** native (budget
+6 ms; the filter recursion's latency bounds both). Screen off, debug build, warmed up: EQ + limiter **6.4 %** (Kotlin
+7.9 %), EQ off 4.1 %, both off 3.0 %. The 3 % budget is still missed with the EQ on; what remains is the player's own
+loop and the float/double copies around the filters.
 
 Bluetooth: off on the Moto (switching it on is a phone-wide setting); not tested. Android Auto: installed on the
 Moto, but testing needs its developer settings changed (the owner's call); the browse tree is covered by
 `LibraryTreeTest`.
 
 The 12R stayed unreachable all session (no wireless debugging advertised on the network).
+
+Soaks: the owner capped scripted soaks at 15 minutes (an 8-hour run was stopped after 5 minutes: 3 clean samples).
+`ThemeTest` (JVM): text, secondary and tertiary text, accent and the accent button's label meet their contrast ratios on
+every surface of the dark, black and light themes.
+15-minute soak (Moto, debug build, native EQ on, muted, repeat all): 15 one-minute samples, playing in every one,
+4 tracks, 0 underruns, one process, the position never stalled (`captures/soak-moto-20261120-1624.jsonl`).
