@@ -36,8 +36,12 @@ object WaveformTuning {
     const val MIN = 0.04f
 }
 
-/** 512 columns of peak, RMS and low/mid/high shares, 5 bytes each (T1). [filled] columns are valid. */
-class WaveformData(val bytes: ByteArray, val filled: Int = COLUMNS) {
+/**
+ * Columns of peak, RMS and low/mid/high shares, 5 bytes each (T1): four a second, at least 512 (see [columnsFor]).
+ * [filled] columns are valid.
+ */
+class WaveformData(val bytes: ByteArray, val filled: Int = bytes.size / 5) {
+    val columns: Int get() = bytes.size / 5
     fun peakDb(i: Int) = (bytes[i * 5].toInt() and 0xff) / 255f * 60f - 60f
     fun rmsDb(i: Int) = (bytes[i * 5 + 1].toInt() and 0xff) / 255f * 60f - 60f
     fun lo(i: Int) = (bytes[i * 5 + 2].toInt() and 0xff) / 255f
@@ -45,18 +49,25 @@ class WaveformData(val bytes: ByteArray, val filled: Int = COLUMNS) {
     fun hi(i: Int) = (bytes[i * 5 + 4].toInt() and 0xff) / 255f
 
     fun toBlob(): ByteArray = ByteBuffer.allocate(10 + bytes.size).put(MAGIC).putShort(VERSION.toShort())
-        .putInt(COLUMNS).put(bytes).array()
+        .putInt(columns).put(bytes).array()
 
     companion object {
-        const val COLUMNS = 512
-        const val VERSION = 1
+        const val MIN_COLUMNS = 512
+        /** Twenty minutes at four a second; longer files are sampled at [MIN_COLUMNS]. */
+        const val MAX_COLUMNS = 4800
+        /** 2: four columns a second for the zoomed, centred seek bar (1 had 512 per track; those are analysed again). */
+        const val VERSION = 2
         private val MAGIC = "TFW1".toByteArray()
 
+        fun columnsFor(durationMs: Long): Int = (durationMs / 250).toInt().coerceIn(MIN_COLUMNS, MAX_COLUMNS)
+
         fun fromBlob(b: ByteArray): WaveformData? {
-            if (b.size != 10 + COLUMNS * 5 || String(b, 0, 4) != "TFW1") return null
+            if (b.size < 10 || String(b, 0, 4) != "TFW1") return null
             val bb = ByteBuffer.wrap(b)
             bb.position(4)
-            if (bb.short.toInt() != VERSION || bb.int != COLUMNS) return null
+            if (bb.short.toInt() != VERSION) return null
+            val cols = bb.int
+            if (cols <= 0 || b.size != 10 + cols * 5) return null
             return WaveformData(b.copyOfRange(10, b.size))
         }
 
@@ -65,8 +76,8 @@ class WaveformData(val bytes: ByteArray, val filled: Int = COLUMNS) {
 }
 
 /**
- * Decodes a file once and summarises it into 512 columns (T1). Also returns the exact decoded frame count.
- * Long files (over 20 minutes) are sampled: half a second at the start of each column.
+ * Decodes a file once and summarises it into columns, four a second (T1). Also returns the exact decoded frame count.
+ * Long files (over 20 minutes) are sampled: half a second at the start of each of 512 columns.
  */
 object WaveformAnalyzer {
     private const val SAMPLED_ABOVE_MS = 20 * 60 * 1000L
@@ -83,13 +94,14 @@ object WaveformAnalyzer {
             val bl = Biquad.design(FilterSpec(FilterType.LOW_PASS, 2500.0, 0.0, 0.7071), fs)
             val z = DoubleArray(8)
             val total = if (dec.exact && dec.totalFrames > 0) dec.totalFrames else max(1L, (durationHintMs * dec.outRate / 1000))
-            val cols = WaveformData.COLUMNS
+            val sampled = durationHintMs > SAMPLED_ABOVE_MS
+            val cols = if (sampled) WaveformData.MIN_COLUMNS else WaveformData.columnsFor(durationHintMs)
+            val emitEvery = maxOf(16, cols / 32)
             val out = ByteArray(cols * 5)
             val peak = DoubleArray(cols); val sm = DoubleArray(cols); val sl = DoubleArray(cols)
             val smid = DoubleArray(cols); val sh = DoubleArray(cols); val cnt = LongArray(cols)
             var lastEmitted = 0
             val buf = FloatArray(NativeDecoder.CHUNK_FRAMES * 2)
-            val sampled = durationHintMs > SAMPLED_ABOVE_MS
             var frame = 0L
 
             fun bq(k: dev.trueform.player.dsp.Coeffs, x: Double, zi: Int): Double {
@@ -150,7 +162,7 @@ object WaveformAnalyzer {
                 feed(n, null)
                 frame += n
                 val doneCols = ((frame * cols) / total).toInt().coerceAtMost(cols)
-                if (doneCols >= lastEmitted + 16) {
+                if (doneCols >= lastEmitted + emitEvery) {
                     for (c in lastEmitted until doneCols) finish(c)
                     lastEmitted = doneCols
                     onPartial(WaveformData(out.copyOf(), doneCols))

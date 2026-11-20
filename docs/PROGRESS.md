@@ -295,3 +295,43 @@ Shared-phone slip (2026-11-20 16:46): during that last measurement another sessi
 was in front on the Moto; the script printed the foreground but did not stop, launched Trueform, pressed Home and
 turned the screen off for about three minutes. No lock was held by the other session. Scripts that send input must
 stop when the foreground is neither the launcher nor Trueform (`Test-TfDeviceFree`), not only print it.
+
+## Follow-up — the owner's hands-on testing on the 12R (2026-11-20, evening)
+
+The 12R came back on the network. Music access for the debug app had to go through the app's own prompt (`pm grant`
+is refused on this OnePlus); the owner then ran the onboarding and used the app (722 tracks, scan 2.7 s + 2.0 s).
+
+Owner reports and what changed:
+
+- **No sound**: the debug app was still muted by a scripted run (in-app volume 0, not the phone's volume). Unmuted;
+  a reinstall also resets it.
+- **"Noticeable lag when swiping and scrolling"** (12R, debug build: median frame 13 ms, 90th percentile 29 ms,
+  UI thread slow, GPU fine). Causes found in our code:
+  - Opening, closing or dragging the player recomposed the whole app on every frame (the expand progress was read in
+    composition: back handler, mini player alpha, visibility). Now read through derived states and in layout/draw.
+  - The waveform asked for a new frame on every vsync while playing and re-recorded the layer it sat in (with the
+    player open: the whole screen, the library under it included). Now it has its own layer and redraws when the
+    playhead moves about half a pixel; the library is not drawn under the open player.
+  - The waveform's two bitmaps were drawn again on every recomposition (a new palette object each time), and the
+    accent colour animated for 500 ms after every track change, recomposing the whole player each frame and redrawing
+    those bitmaps each frame. Stable cache; the accent switches; the backdrop still fades, read only when drawing.
+  - Palette extraction (artwork colours) ran on the main thread; now on a background dispatcher.
+  - Crossfade per list picture and the transition's own fade on the large artwork rendered offscreen copies;
+    replaced by per-drawing alpha. Decoded pictures are uploaded to the GPU before their first frame.
+  - Measured on the Moto (debug build, scripted, `dumpsys gfxinfo`, real playback): opening/closing the player 51 % →
+    9 % janky frames (median 17 → 8 ms), track changes 61 % → 33 % (still GPU-bound on the Moto: about 9 ms of GPU per
+    frame for the player screen at the clocks it runs at), list scrolling unchanged (already smooth). Not measured on
+    the 12R yet: the owner was using it.
+- **Swipe animation** ("does it slide the way you swipe?" — it did not): the artwork, title and mini player follow the
+  finger, then slide out the way they were swiped while the next track comes in from the other side; a short or
+  impossible swipe springs back (with resistance where there is no track). Previous/next buttons slide the same way.
+- **Mini player**: Previous button.
+- **Folder browser**: swipe in from the left edge to go up a folder (the folder follows the finger). Plain left and
+  right swipes were already taken on song rows (add to queue, play next), so the gesture starts at the edge.
+- **Artwork that never loaded after swiping to a song** (reported through another session): the player and the
+  notification (through `ArtProvider`) asked for the same large picture at the same moment and wrote the same
+  temporary file; one failed or the file was damaged, and the player kept the placeholder. Each writer now has its
+  own temporary file, and a file that does not decode is made again.
+- **Seek bar centred and zoomed, with momentum** ("like Poweramp"): see 05-waveform-seekbar.md. Four waveform
+  columns a second (blob version 2: stored waveforms are analysed again when their track plays). `WaveformTest`
+  (JVM): blob round trip with any column count, column bounds, zoomed bar pooling with partial data.

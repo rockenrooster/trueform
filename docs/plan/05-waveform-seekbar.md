@@ -10,7 +10,8 @@ The owner chose this over a live spectrum analyser. Do not build a live analyser
 
 | Topic | Decision |
 |---|---|
-| Resolution | 512 columns per track, whatever its length. Screens show 90–300 bars; columns are pooled down when drawing. |
+| Resolution | Four columns a second, at least 512 and at most 4,800 (20 minutes); longer files are sampled at 512. Blob version 2 (version 1 had 512 per track; those are analysed again). Changed 2026-11-20 for the zoomed seek bar. |
+| Layout | **Centred** (default since 2026-11-20, the owner's request, "like Poweramp"): the playhead stays in the middle and about 30 seconds of the track scroll under it; bars fade towards both ends; a drag scrubs and a flick glides on with a little momentum before it seeks; a tap brings the tapped point to the playhead. Setting "Centred playhead" off: the whole track with a moving playhead (below). The mini player always shows the whole track. |
 | Per column | peak level, RMS level, and the shares of low / mid / high energy: 5 bytes |
 | Bands | low below 250 Hz, mid 250 Hz–2.5 kHz, high above 2.5 kHz (second-order filters on the mono mix) |
 | Storage | `waveforms(trackId PRIMARY KEY, version INTEGER, data BLOB)` in Room, about 2.6 KB per analysed track, deleted with its track or when the file changes |
@@ -48,6 +49,11 @@ the current track that is more than half done finishes.
 its partial results. `QueueController` calls `WaveformRepo.prepare(current, next1, next2)` on every transition.
 
 ## T2. Drawing (`WaveSeekbar` composable)
+
+Centred layout: bars sit at fixed track times (they do not shimmer as they scroll), pooled from the columns under
+each bar; per frame only the visible bars are drawn (about 75 on a phone), in their own layer, redrawn when the track
+has moved about a pixel (every ~30 ms while playing), not every frame. The rest of this section describes the
+whole-track layout.
 
 Inputs: `WaveformData?`, duration, a position provider (a lambda read in the draw phase), `isPlaying`, colours,
 style settings, `onSeek(ms)`.

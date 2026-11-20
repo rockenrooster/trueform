@@ -271,6 +271,7 @@ fun NowPlaying(
     val shape by g.settings.flow(S.waveShape).collectAsState(g.settings[S.waveShape])
     val colorMode by g.settings.flow(S.waveColor).collectAsState(g.settings[S.waveColor])
     val live by g.settings.flow(S.seekWhileDragging).collectAsState(g.settings[S.seekWhileDragging])
+    val centred by g.settings.flow(S.waveCentred).collectAsState(g.settings[S.waveCentred])
     val output by g.outputs.label.collectAsState()
     val limitDb = remember { mutableStateOf(0f) }
     var showRemaining by remember { mutableStateOf(true) }
@@ -347,7 +348,7 @@ fun NowPlaying(
                 // waveform
                 Box(Modifier.fillMaxWidth().padding(top = 18.dp)) {
                     WaveSeekbar(wave, ui.durationMs, ui::position, ui.isPlaying, ui::seek, height = 80.dp, detail = detail, shape = shape,
-                        colorMode = colorMode, accent = accent, seekWhileDragging = live)
+                        colorMode = colorMode, accent = accent, seekWhileDragging = live, centred = centred)
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     PositionText(ui, Modifier.weight(1f), remaining = false)

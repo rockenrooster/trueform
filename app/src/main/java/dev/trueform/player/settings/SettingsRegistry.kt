@@ -98,6 +98,7 @@ object S {
     val waveShape = Choice("wave_shape", WaveShape.BARS, LOOK, "Waveform shape", WaveShape.entries, { it.label }, keywords = "seekbar")
     val waveColor = Choice("wave_color", WaveColor.SPECTRAL, LOOK, "Waveform colour", WaveColor.entries, { it.label }, keywords = "seekbar spectrum")
     val seekWhileDragging = Toggle("seek_while_dragging", false, LOOK, "Seek while dragging", "Hear the position while scrubbing the waveform", "scrub seekbar")
+    val waveCentred = Toggle("wave_centred", true, LOOK, "Centred playhead", "The waveform scrolls under a fixed playhead, about 30 seconds across. Off: the whole track", "seekbar zoom scroll poweramp")
 
     // Cast
     val castDsp = Toggle("cast_dsp", true, CAST, "Apply EQ and gain when casting", "Off: the Chromecast gets the original file wherever it can play it", "chromecast eq replaygain")
@@ -138,7 +139,7 @@ object S {
         limiter, limiterCeiling,
         openEqualizer, gainRange, accurateBands, eqPerOutput, outputProfiles, exportPresets, importPresets,
         theme, lockPortrait, artworkColors, playerBackground, density, showFileNames, swipeToQueue, swipeMini, haptics, waveDetail,
-        waveShape, waveColor, seekWhileDragging,
+        waveShape, waveColor, waveCentred, seekWhileDragging,
         castDsp, castQuality, castKeepAwake, castBattery, castResetKey, castLog,
         pauseOnDisconnect, resumeOnConnect, resumeOnlyIfPlaying, resumeDelayMs, notificationButtons,
         checkUpdates, checkNow, buildInfo,
