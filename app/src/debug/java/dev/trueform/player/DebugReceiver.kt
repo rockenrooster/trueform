@@ -124,6 +124,8 @@ class DebugReceiver : BroadcastReceiver() {
                     else -> Log.w(TAG, "no stored setting $key")
                 }
             }
+            "cast_stop" -> g.cast?.stop()
+            "cast_log" -> g.cast?.log?.lines()?.takeLast(i.getIntExtra("n", 40))?.forEach { Log.i(TAG, "castlog: $it") }
             "cast_http" -> {   // the cast server without a session, for the PC test of its routes (07-chromecast.md T2)
                 val base = g.cast?.startServerForTest()
                 val t = withContext(Dispatchers.IO) { g.library.libraryOrder().firstOrNull()?.let { g.library.track(it) } }
@@ -155,6 +157,8 @@ class DebugReceiver : BroadcastReceiver() {
             .put("library", counts).put("scan", "${scan.phase} ${scan.found} ${scan.probed}/${scan.toProbe}")
             .put("scanMs", "${g.scanner.lastTimings.first}/${g.scanner.lastTimings.second}")
             .put("eqOn", g.dsp.state.value.on).put("preampDb", g.localDsp.preampDb)
+            .put("cast", g.cast?.state?.value?.let { "${it.phase} ${it.device ?: ""}".trim() } ?: "unavailable")
+            .put("remote", g.cast?.isRemote == true)
             .put("limitDb", (g.localDsp.limiter?.reductionDb ?: 0f).toDouble())
         Log.i("TFSTATE", o.toString())
     }

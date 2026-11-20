@@ -146,6 +146,9 @@ object PlayerFactory {
             .setAudioAttributes(attributes(), settings[S.respectFocus])
             .setHandleAudioBecomingNoisy(settings[S.pauseOnDisconnect])
             .setWakeMode(C.WAKE_MODE_LOCAL)
+            // the playback thread sleeps until the audio output needs data instead of waking every 10 ms
+            // (measured on the Moto, screen off, 10-band EQ: 7.6 % of a core before)
+            .experimentalSetDynamicSchedulingEnabled(true)
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(30_000)
             .build()

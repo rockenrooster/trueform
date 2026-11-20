@@ -110,7 +110,34 @@ class CastManager(private val g: AppGraph) : CastHttpServer.Handler {
         g.app.getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
             NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(), NetworkWatcher())
         watchSettings()
-        return CastPlayer.Builder(g.app).setLocalPlayer(local).setRemotePlayer(remote).setTransferCallback(Transfer()).build()
+        val player = CastPlayer.Builder(g.app).setLocalPlayer(local).setRemotePlayer(remote).setTransferCallback(Transfer()).build()
+        if (g.settings.privateLong(OPEN) != 0L) discoverForResume()
+        return player
+    }
+
+    /**
+     * The last process ended with a session open (killed while casting): the Cast framework resumes it only once the
+     * receiver is discovered again, and nothing else asks for discovery at start-up (seen on the Moto: the speaker
+     * played on, the restarted app never re-attached). Scan for 30 s.
+     */
+    private fun discoverForResume() {
+        val router = androidx.mediarouter.media.MediaRouter.getInstance(g.app)
+        // the framework's own selector (its category carries flags, e.g. "…/CC1AD845///ALLOW_IPV6"): the saved
+        // session names routes in that category
+        val selector = runCatching { com.google.android.gms.cast.framework.CastContext.getSharedInstance()?.mergedSelector }.getOrNull()
+            ?: androidx.mediarouter.media.MediaRouteSelector.Builder()
+                .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
+                .build()
+        val callback = object : androidx.mediarouter.media.MediaRouter.Callback() {}
+        router.addCallback(selector, callback, androidx.mediarouter.media.MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
+        log.add("session: the last one was left open; looking for its receiver")
+        main.postDelayed({
+            router.removeCallback(callback)
+            if (_state.value.phase == CastState.Phase.NONE) {   // nothing came back: do not scan at every start
+                g.settings.putPrivateLong(OPEN, 0)
+                log.add("session: the last one did not come back")
+            }
+        }, 30_000)
     }
 
     /** "Stop casting": the receiver stops; the phone takes the queue, paused. */
@@ -157,6 +184,7 @@ class CastManager(private val g: AppGraph) : CastHttpServer.Handler {
         startServer()
         val name = s.castDevice?.friendlyName ?: "Chromecast"
         _state.value = CastState(CastState.Phase.CONNECTED, name)
+        g.settings.putPrivateLong(OPEN, 1)
         g.outputs.setCast(name)
         log.add("session: $how ($name)")
         guard.update()
@@ -164,6 +192,7 @@ class CastManager(private val g: AppGraph) : CastHttpServer.Handler {
 
     private fun ended(how: String) {
         _state.value = CastState.NONE
+        g.settings.putPrivateLong(OPEN, 0)
         g.outputs.setCast(null)
         log.add("session: $how")
         guard.update()
@@ -449,6 +478,7 @@ class CastManager(private val g: AppGraph) : CastHttpServer.Handler {
         const val REMOTE_AHEAD = 20
         private const val KEY = "cast_key"
         private const val PORT = "cast_port"
+        private const val OPEN = "cast_session_open"   // 1 while a session is connected; still 1 if the process died
 
         fun available(context: Context): Boolean =
             GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS

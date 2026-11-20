@@ -44,6 +44,13 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dd, 1f), content = content)
         }
         handleOpenWith(intent)
+        // The Cast framework has to exist while this activity starts, or it misses the moment to resume a session the
+        // last process left running on a receiver (seen on the Moto: the speaker played on, the app never re-attached).
+        // It reads our options from the manifest (TfCastOptionsProvider).
+        if (dev.trueform.player.cast.CastManager.available(this)) runCatching {
+            com.google.android.gms.cast.framework.CastContext.getSharedInstance(applicationContext,
+                java.util.concurrent.Executors.newSingleThreadExecutor())
+        }
         lifecycleScope.launch {
             g.settings.flow(S.keepScreenOn).collect { on ->
                 if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
