@@ -222,6 +222,10 @@ library and settings; `scripts/test.ps1` now keeps the APKs installed. A test ru
   play. Memory after this run (debug build, 20,000-track library): 215 MB PSS.
 - Waveform: 384 kHz 8 s in 337 ms, MP3 10 s in 195 ms, two-hour Opus (sampled) in 2.5 s; extrapolated 4-minute FLAC
   about 2.9 s and MP3 about 4.7 s on the Moto (budgets 4 s and 7 s).
-- Not done (needs the owner or time with the phones untouched): the 8-hour and Bluetooth/cast soaks, the CPU sample
+- CPU while playing (Moto, R8 release build, app in the background, screen on, FLAC with the 10-band "Bass boost",
+  	op -b -n 1 every 6 s for a minute): 3.7–11.1 % of one core, median about 7 %, including two waveform analyses of
+  the next tracks and one 96 kHz track. The budget (under 3 %, screen off, 5-minute average) is **not met** by this
+  measurement; the screen-off run is still to do. Debug build, same test: 3.5–14 %.
+- Not done (needs the owner or time with the phones untouched): the 8-hour and Bluetooth/cast soaks, the CPU run
   with the screen off (the owner asked to keep the screens on), TalkBack and 200 % font passes, the Fire tablet
   no-Cast check, the 12R measurements (the 12R was not connected during this session).
