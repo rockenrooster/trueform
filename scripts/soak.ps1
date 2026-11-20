@@ -26,6 +26,7 @@ try {
     $samples = @()
     while ((Get-Date) -lt $end) {
         Start-Sleep -Seconds 60
+        Enter-TfDeviceLock $serial   # refresh: other sessions treat a lock older than 30 minutes as free
         $json = Get-State
         $now = Get-Date -Format 'o'
         if (-not $json) { Add-Content $out "{`"time`":`"$now`",`"error`":`"no state`"}"; continue }

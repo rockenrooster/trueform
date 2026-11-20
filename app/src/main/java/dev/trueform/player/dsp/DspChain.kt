@@ -142,6 +142,10 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
     ) {
         val z = DoubleArray(coeffs.size * 4)
         private val preamp = 10.0.pow(preampDb / 20)
+        /** b0 b1 b2 a1 a2 per filter, for the native cascade (several times cheaper than the Kotlin loop on a phone). */
+        private val flat = DoubleArray(coeffs.size * 5).also { a ->
+            coeffs.forEachIndexed { f, k -> a[f * 5] = k.b0; a[f * 5 + 1] = k.b1; a[f * 5 + 2] = k.b2; a[f * 5 + 3] = k.a1; a[f * 5 + 4] = k.a2 }
+        }
         val neutral = coeffs.isEmpty() && preampDb == 0.0 && gl == 1.0 && gr == 1.0 && !mono
 
         fun clear() = z.fill(0.0)
@@ -153,7 +157,8 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
         fun run(b: DoubleArray, frames: Int) {
             val n = frames * 2
             if (preampDb != 0.0) for (i in 0 until n) b[i] *= preamp
-            for (f in coeffs.indices) {
+            if (coeffs.isNotEmpty() && nativeCascade) dev.trueform.player.audio.Native.cascade(b, frames, flat, z)
+            else for (f in coeffs.indices) {
                 val k = coeffs[f]
                 val b0 = k.b0; val b1 = k.b1; val b2 = k.b2; val a1 = k.a1; val a2 = k.a2
                 var z1l = z[f * 4]; var z2l = z[f * 4 + 1]; var z1r = z[f * 4 + 2]; var z2r = z[f * 4 + 3]
@@ -203,7 +208,9 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
         }
     }
 
-    private companion object {
-        const val FADE = 2048
+    companion object {
+        private const val FADE = 2048
+        /** The EQ's filters in native code where the library loads; a device test switches it off to compare. */
+        @Volatile var nativeCascade: Boolean = dev.trueform.player.audio.NativeCheck.loaded
     }
 }

@@ -8,7 +8,12 @@
 #include <cstdio>
 #include <cstring>
 #include <strings.h>
+#include <cmath>
 #include <vector>
+
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 #include "tf_decoder.h"
 
@@ -197,6 +202,51 @@ void close(JNIEnv*, jclass, jlong h) { delete reinterpret_cast<tf::Decoder*>(h);
 
 void setTrace(JNIEnv*, jclass, jboolean on) { tf::gTrace = on; }
 
+// The equalizer's biquad cascade (DspChain.Stage), in place over interleaved stereo doubles: transposed direct form II
+// as in the Kotlin loop it replaces; on arm64 left and right are the two lanes of one register. coeffs: b0 b1 b2 a1 a2
+// per filter; z: z1l z2l z1r z2r per filter. States that fall into the denormal range are flushed (long silences).
+void cascade(JNIEnv* env, jclass, jdoubleArray jbuf, jint frames, jdoubleArray jcoeffs, jdoubleArray jz) {
+    const jsize filters = env->GetArrayLength(jcoeffs) / 5;
+    if (frames <= 0 || filters <= 0 || env->GetArrayLength(jz) < filters * 4 || env->GetArrayLength(jbuf) < frames * 2) return;
+    auto* buf = static_cast<double*>(env->GetPrimitiveArrayCritical(jbuf, nullptr));
+    auto* k = static_cast<double*>(env->GetPrimitiveArrayCritical(jcoeffs, nullptr));
+    auto* z = static_cast<double*>(env->GetPrimitiveArrayCritical(jz, nullptr));
+    if (buf && k && z) {
+        for (jsize f = 0; f < filters; ++f) {
+            const double* c = k + f * 5;
+            double* s = z + f * 4;
+#if defined(__aarch64__)
+            const float64x2_t b0 = vdupq_n_f64(c[0]), b1 = vdupq_n_f64(c[1]), b2 = vdupq_n_f64(c[2]);
+            const float64x2_t a1 = vdupq_n_f64(c[3]), a2 = vdupq_n_f64(c[4]);
+            float64x2_t z1 = {s[0], s[2]};
+            float64x2_t z2 = {s[1], s[3]};
+            for (jint i = 0; i < frames; ++i) {
+                const float64x2_t x = vld1q_f64(buf + 2 * i);
+                const float64x2_t y = vaddq_f64(vmulq_f64(b0, x), z1);
+                z1 = vaddq_f64(vsubq_f64(vmulq_f64(b1, x), vmulq_f64(a1, y)), z2);
+                z2 = vsubq_f64(vmulq_f64(b2, x), vmulq_f64(a2, y));
+                vst1q_f64(buf + 2 * i, y);
+            }
+            double out[4] = {vgetq_lane_f64(z1, 0), vgetq_lane_f64(z2, 0), vgetq_lane_f64(z1, 1), vgetq_lane_f64(z2, 1)};
+#else
+            double z1l = s[0], z2l = s[1], z1r = s[2], z2r = s[3];
+            for (jint i = 0; i < frames; ++i) {
+                const double xl = buf[2 * i], xr = buf[2 * i + 1];
+                const double yl = c[0] * xl + z1l, yr = c[0] * xr + z1r;
+                z1l = c[1] * xl - c[3] * yl + z2l; z2l = c[2] * xl - c[4] * yl;
+                z1r = c[1] * xr - c[3] * yr + z2r; z2r = c[2] * xr - c[4] * yr;
+                buf[2 * i] = yl; buf[2 * i + 1] = yr;
+            }
+            double out[4] = {z1l, z2l, z1r, z2r};
+#endif
+            for (int j = 0; j < 4; ++j) s[j] = std::fabs(out[j]) < 1e-30 ? 0.0 : out[j];
+        }
+    }
+    if (z) env->ReleasePrimitiveArrayCritical(jz, z, 0);
+    if (k) env->ReleasePrimitiveArrayCritical(jcoeffs, k, JNI_ABORT);
+    if (buf) env->ReleasePrimitiveArrayCritical(jbuf, buf, 0);
+}
+
 const JNINativeMethod kMethods[] = {
     {"ffmpegVersion", "()Ljava/lang/String;", reinterpret_cast<void*>(ffmpegVersion)},
     {"errorString", "(I)Ljava/lang/String;", reinterpret_cast<void*>(errorString)},
@@ -209,6 +259,7 @@ const JNINativeMethod kMethods[] = {
     {"scanFrames", "(J)J", reinterpret_cast<void*>(scanFrames)},
     {"close", "(J)V", reinterpret_cast<void*>(close)},
     {"setTrace", "(Z)V", reinterpret_cast<void*>(setTrace)},
+    {"cascade", "([DI[D[D)V", reinterpret_cast<void*>(cascade)},
 };
 
 }  // namespace

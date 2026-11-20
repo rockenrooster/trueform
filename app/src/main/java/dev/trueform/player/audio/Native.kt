@@ -71,4 +71,15 @@ internal object Native {
 
     /** Logs decoder timestamps (logcat tag TFDEC); for tests. */
     external fun setTrace(on: Boolean)
+
+    /** The EQ's biquad cascade in place over interleaved stereo (DspChain): coeffs b0 b1 b2 a1 a2, z z1l z2l z1r z2r. */
+    external fun cascade(buf: DoubleArray, frames: Int, coeffs: DoubleArray, z: DoubleArray)
+
+    /** False where the library cannot load (JVM unit tests): callers keep a Kotlin path. */
+    val available: Boolean by lazy { runCatching { ffmpegVersion(); true }.getOrDefault(false) }
+}
+
+/** Whether [Native] loads, asked without touching it first (its initializer throws on the JVM). */
+internal object NativeCheck {
+    val loaded: Boolean = runCatching { Native.available }.getOrDefault(false)
 }
