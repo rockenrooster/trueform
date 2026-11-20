@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings and EQ presets are backed up; the library database, waveforms, artwork and logs are rebuilt. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="settings.xml" />
+        <include domain="file" path="eq.json" />
+        <include domain="file" path="presets.json" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="settings.xml" />
+        <include domain="file" path="eq.json" />
+        <include domain="file" path="presets.json" />
+    </device-transfer>
+</data-extraction-rules>

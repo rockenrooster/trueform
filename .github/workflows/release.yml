@@ -1,0 +1,157 @@
+# The release APK on GitHub (docs/RELEASE_PIPELINE.md). Every push to main (and a run by hand) builds FFmpeg (cached),
+# runs the unit tests, builds the signed release and publishes it as a GitHub release: tag build-<commit count>, the APK
+# as trueform.apk (so releases/latest/download/trueform.apk is always the newest), its SHA-256, the unstripped native
+# library and R8's mapping. Without the signing secrets nothing is published: the in-app updater cannot install an APK
+# signed with another key, so such a build only stays with the run for a week.
+name: Release APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+# One build at a time per branch; a newer push replaces a waiting or running one (its commit is in the newer build).
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # (the release and its tag)
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TF_NDK: '28.2.13676358'  # app/build.gradle.kts ndkVersion and scripts/build-ffmpeg.sh
+      TF_CMAKE: '3.22.1'
+    steps:
+      - name: Check out (the whole history; the commit count is the build number)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Android SDK packages (the NDK, CMake, platform 37.2)
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "ndk;$TF_NDK" "cmake;$TF_CMAKE" "platforms;android-37.2" "build-tools;36.0.0" > /dev/null
+
+      - name: Restore FFmpeg
+        id: ffmpeg
+        uses: actions/cache@v6
+        with:
+          path: third_party/ffmpeg
+          key: ffmpeg-${{ env.TF_NDK }}-${{ hashFiles('scripts/build-ffmpeg.sh') }}
+
+      - name: Build FFmpeg (scripts/build-ffmpeg.sh; only when the cache misses)
+        if: steps.ffmpeg.outputs.cache-hit != 'true'
+        run: NDK="$ANDROID_HOME/ndk/$TF_NDK" TF_FFMPEG_WORK="$RUNNER_TEMP/ffmpeg-work" bash scripts/build-ffmpeg.sh
+
+      - name: Unit tests
+        run: bash ./gradlew --no-daemon --console=plain :app:testReleaseUnitTest
+
+      - name: Build the release APK
+        env:
+          TF_KEYSTORE_BASE64: ${{ secrets.TF_KEYSTORE_BASE64 }}
+          TF_KEYSTORE_PASSWORD: ${{ secrets.TF_KEYSTORE_PASSWORD }}
+          TF_KEY_ALIAS: ${{ secrets.TF_KEY_ALIAS }}
+          TF_KEY_PASSWORD: ${{ secrets.TF_KEY_PASSWORD }}
+        run: |
+          trap 'rm -f "$RUNNER_TEMP/release.keystore"' EXIT
+          if [ -n "$TF_KEYSTORE_BASE64" ]; then
+            printf '%s' "$TF_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export TF_KEYSTORE="$RUNNER_TEMP/release.keystore"
+            echo "TF_SIGNED=secrets" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing secrets: this build is debug-signed and will not be published (docs/RELEASE_PIPELINE.md)"
+            echo "TF_SIGNED=none" >> "$GITHUB_ENV"
+          fi
+          unset TF_KEYSTORE_BASE64
+          export TF_BUILD_NUMBER=$(git rev-list --count HEAD)
+          export TF_COMMIT=$(git rev-parse --short=7 HEAD)
+          bash ./gradlew --no-daemon --console=plain :app:assembleRelease
+
+      - name: Package (the APK, its SHA-256, the symbols, the mapping) and write the notes
+        id: pkg
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          count=$(git rev-list --count HEAD)
+          short=$(git rev-parse --short=7 HEAD)
+          version=$(sed -n 's/^ *versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
+          tag="build-$count"
+          mkdir -p out
+          cp "$apk" out/trueform.apk
+          (cd out && sha256sum trueform.apk > trueform.apk.sha256)
+          lib=$(find app/build/intermediates/merged_native_libs/release -name libtrueform.so | head -n 1)
+          test -n "$lib"
+          zip -q -j out/trueform-symbols.zip "$lib"
+          cp app/build/outputs/mapping/release/mapping.txt out/mapping.txt
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/[0-9]* | sort -V | tail -n 1)
+          certs=$("$bt/apksigner" verify --print-certs -v out/trueform.apk 2>&1)
+          echo "apksigner $(basename "$bt"):"
+          printf '%s\n' "$certs" | grep -iE 'verified|signer|warning|error' || true
+          digest=$(printf '%s\n' "$certs" | grep -m 1 'certificate SHA-256 digest: ' | sed 's/.*SHA-256 digest: //' || true)
+          prev=$(git tag --list 'build-*' --sort=-version:refname | grep -vx "$tag" | head -n 1 || true)
+          {
+            echo "Trueform $version, build $count: commit \`$short\`, built $(date -u '+%Y-%m-%d %H:%M') UTC."
+            echo
+            echo "**Install:** on the phone, download \`trueform.apk\` and open it (Android asks once to allow installs from the browser). Android 10 or later, 64-bit ARM. Installed copies update themselves from the app."
+            echo
+            echo "**Signing certificate SHA-256:** \`$digest\`"
+            echo
+            if [ -n "$prev" ] && git merge-base --is-ancestor "$prev" HEAD; then
+              echo "**Changes since $prev:**"
+              git log --no-merges --format='- %s (%h)' -n 40 "$prev..HEAD"
+            else
+              echo "**Latest changes:**"
+              git log --no-merges --format='- %s (%h)' -n 15
+            fi
+            echo
+            echo "\`trueform-symbols.zip\`: the unstripped native library, for reading a crash report (ndk-stack). \`mapping.txt\`: R8's mapping, for stack traces."
+          } > "$RUNNER_TEMP/notes.md"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "title=Trueform $version build $count" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Trueform $version build $count ($short)"
+            echo "APK: $(stat -c %s out/trueform.apk) bytes. Signed: $TF_SIGNED."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the release (main, signed)
+        if: github.ref == 'refs/heads/main' && env.TF_SIGNED == 'secrets'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.pkg.outputs.tag }}
+          TITLE: ${{ steps.pkg.outputs.title }}
+        run: |
+          assets=(out/trueform.apk out/trueform.apk.sha256 out/trueform-symbols.zip out/mapping.txt)
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          else
+            gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" \
+              --notes-file "$RUNNER_TEMP/notes.md" --latest
+          fi
+          echo "Download: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/latest/download/trueform.apk" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the APK with the run (not published)
+        if: github.ref != 'refs/heads/main' || env.TF_SIGNED != 'secrets'
+        uses: actions/upload-artifact@v7
+        with:
+          name: trueform-${{ steps.pkg.outputs.tag }}
+          path: out/trueform.apk
+          retention-days: 7

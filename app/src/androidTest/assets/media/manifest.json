@@ -1,0 +1,249 @@
+{
+ "files": [
+  {
+   "name": "tone.wav",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone.flac",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone_alac.m4a",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone.wv",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone.aiff",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone_f32.wav",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tone_cbr320.mp3",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone_v2.mp3",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone_noheader.mp3",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone_aac.m4a",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone.ogg",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone.opus",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone.wma",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "tone_mono.flac",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 1
+  },
+  {
+   "name": "tone_51.flac",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 6
+  },
+  {
+   "name": "hires.wav",
+   "source": "hires.wav",
+   "rate": 96000,
+   "frames": 192000,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "hires.flac",
+   "source": "hires.wav",
+   "rate": 96000,
+   "frames": 192000,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "bursts.wav",
+   "source": "bursts.wav",
+   "rate": 44100,
+   "frames": 352800,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "tagged.flac",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "badtag.mp3",
+   "source": "tone.wav",
+   "rate": 44100,
+   "frames": 132300,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_a.flac",
+   "source": "gap_a.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "gap_a.mp3",
+   "source": "gap_a.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_a.m4a",
+   "source": "gap_a.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_a.ogg",
+   "source": "gap_a.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_a.opus",
+   "source": "gap_a.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_b.flac",
+   "source": "gap_b.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": true,
+   "channels": 2
+  },
+  {
+   "name": "gap_b.mp3",
+   "source": "gap_b.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_b.m4a",
+   "source": "gap_b.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_b.ogg",
+   "source": "gap_b.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  },
+  {
+   "name": "gap_b.opus",
+   "source": "gap_b.flac",
+   "rate": 48000,
+   "frames": 96000,
+   "lossless": false,
+   "channels": 2
+  }
+ ],
+ "hostile": [
+  "truncated.flac",
+  "empty.mp3",
+  "text.mp3"
+ ]
+}

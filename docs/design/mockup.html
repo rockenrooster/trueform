@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trueform UI reference</title>
+<style>
+  /* Dark tokens. Same names and values as docs/plan/04-ui-ux.md section 2. */
+  :root {
+    --bg: #0B0C0F;
+    --surface1: #13151A;
+    --surface2: #1B1E25;
+    --surface3: #252933;
+    --outline: #2E333D;
+    --outline-strong: #454B57;
+    --text: #F3F4F6;
+    --text-secondary: #A8AEBB;
+    --text-tertiary: #737A88;
+    --accent: #FFB547;
+    --on-accent: #1C1200;
+    --accent-dim: #3A2A0C;
+    --wave-low: #FF5E4D;
+    --wave-mid: #FFC24B;
+    --wave-high: #7CE4FF;
+    --positive: #5BD68A;
+    --danger: #FF6B6B;
+    --limit: #FF8A3D;
+    --r-pill: 6px; --r-thumb: 10px; --r-card: 14px; --r-art: 22px; --r-sheet: 28px;
+    --font: Inter, "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: #050506; }
+  body { margin: 0; padding: 32px 24px 64px; background: #050506; color: var(--text); font-family: var(--font); }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .lede { color: var(--text-secondary); font-size: 14px; line-height: 20px; margin: 0 0 28px; max-width: 760px; }
+  .stage { display: flex; flex-wrap: wrap; gap: 28px 32px; align-items: flex-start; }
+  figure { margin: 0; }
+  figcaption { color: var(--text-secondary); font-size: 13px; line-height: 18px; margin-top: 12px; max-width: 360px; }
+  figcaption b { color: var(--text); font-weight: 600; }
+
+  .phone {
+    width: 360px; height: 780px; background: var(--bg); border-radius: 36px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 1px #2a2d35, 0 0 0 9px #101116, 0 0 0 10px #2a2d35, 0 30px 60px rgba(0,0,0,.6);
+    display: flex; flex-direction: column;
+  }
+  .status { height: 28px; flex: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 22px; font-size: 12px; font-weight: 600; color: var(--text); font-feature-settings: "tnum"; }
+  .status .batt { width: 22px; height: 10px; border: 1.5px solid var(--text-secondary); border-radius: 3px; position: relative; }
+  .status .batt::after { content: ""; position: absolute; inset: 1px; right: 5px; background: var(--text-secondary); border-radius: 1px; }
+  .gesture { height: 20px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .gesture i { width: 108px; height: 4px; border-radius: 2px; background: var(--text-tertiary); opacity: .7; }
+
+  svg.ic { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.ic.solid { fill: currentColor; stroke: none; }
+  .iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: var(--text); position: relative; }
+  .iconbtn.pressed::before, .row.pressed::before, .pillbtn.pressed::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--text); opacity: .16; }
+  .iconbtn.focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Library ---------- */
+  .topbar { height: 52px; flex: none; display: flex; align-items: center; padding: 0 4px 0 16px; gap: 2px; }
+  .topbar .title { font-size: 20px; line-height: 26px; font-weight: 600; margin-right: 10px; }
+  .topbar .spacer { flex: 1; }
+  .update { font-size: 11px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .crumbs { height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 16px; font-size: 13px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+  .crumbs span.c { background: var(--surface2); border-radius: 999px; padding: 4px 10px; }
+  .crumbs span.c.cur { background: var(--accent-dim); color: var(--accent); }
+  .crumbs .sep { color: var(--text-tertiary); }
+  .tabs { height: 40px; flex: none; display: flex; align-items: stretch; gap: 20px; padding: 0 16px; border-bottom: 1px solid var(--outline); font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .tabs span { display: flex; align-items: center; position: relative; }
+  .tabs span.on { color: var(--text); }
+  .tabs span.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--accent); }
+  .folderhead { height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .pillbtn { height: 36px; padding: 0 14px 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; position: relative; }
+  .pillbtn.primary { background: var(--accent); color: var(--on-accent); }
+  .pillbtn.ghost { border: 1px solid var(--outline-strong); color: var(--text); }
+  .pillbtn svg.ic { width: 20px; height: 20px; }
+  .folderhead .meta { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--text-secondary); font-feature-settings: "tnum"; }
+  .list { flex: 1; overflow: hidden; }
+  .row { height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 16px; position: relative; }
+  .thumb { width: 44px; height: 44px; border-radius: var(--r-thumb); flex: none; position: relative; overflow: hidden; display: grid; place-items: center; color: var(--text-secondary); background: var(--surface2); }
+  .row .txt { flex: 1; min-width: 0; }
+  .row .t1 { font-size: 16px; line-height: 22px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .t2 { font-size: 13px; line-height: 18px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: "tnum"; }
+  .row .trail { font-size: 12px; font-weight: 500; color: var(--text-secondary); font-feature-settings: "tnum"; display: flex; align-items: center; gap: 8px; }
+  .row.playing .t1 { color: var(--accent); }
+  .row.playing { background: linear-gradient(90deg, rgba(255,181,71,.10), rgba(255,181,71,0) 70%); }
+  .fmt { font-size: 10px; font-weight: 600; letter-spacing: .3px; color: var(--text-secondary); border: 1px solid var(--outline-strong); border-radius: var(--r-pill); padding: 1px 5px; }
+  .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+  .bars i { width: 3px; border-radius: 1.5px; background: var(--accent); animation: bop 900ms ease-in-out infinite; }
+  .bars i:nth-child(1) { height: 60%; animation-delay: -200ms; }
+  .bars i:nth-child(2) { height: 100%; animation-delay: -500ms; }
+  .bars i:nth-child(3) { height: 40%; animation-delay: -50ms; }
+  @keyframes bop { 0%,100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+  .bars i { transform-origin: bottom; }
+  .mini { height: 64px; flex: none; background: var(--surface1); border-top: 1px solid var(--outline); display: flex; align-items: center; gap: 12px; padding: 0 6px 0 10px; position: relative; overflow: hidden; }
+  .mini svg.wave { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .34; }
+  .mini > * { position: relative; }
+  .mini .t1 { font-size: 15px; line-height: 20px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini .t2 { font-size: 12px; line-height: 16px; color: var(--text-secondary); }
+
+  /* artwork placeholders */
+  .art-a { background:
+      radial-gradient(120% 90% at 18% 12%, #ffb36b 0%, rgba(255,179,107,0) 55%),
+      radial-gradient(90% 80% at 88% 28%, #ff5e7a 0%, rgba(255,94,122,0) 60%),
+      radial-gradient(110% 100% at 60% 105%, #4a36b8 0%, rgba(74,54,184,0) 65%),
+      linear-gradient(160deg, #1b1035, #0d1a3a); }
+  .art-b { background: radial-gradient(110% 110% at 80% 10%, #7ce4ff 0%, rgba(124,228,255,0) 55%), linear-gradient(200deg, #0e3b52, #0a1422); }
+  .art-c { background: radial-gradient(100% 100% at 20% 90%, #ffc24b 0%, rgba(255,194,75,0) 60%), linear-gradient(140deg, #5a1d1d, #1a0d12); }
+  .art-d { background: radial-gradient(100% 100% at 70% 20%, #9cf0b8 0%, rgba(156,240,184,0) 55%), linear-gradient(170deg, #173a2a, #0a1512); }
+
+  /* ---------- Now Playing ---------- */
+  .np { background: linear-gradient(180deg, #3b2040 0%, #1b1424 36%, var(--bg) 62%); --accent: #FFB36B; --accent-dim: #40260f; }
+  .np .top { height: 48px; flex: none; display: flex; align-items: center; padding: 0 4px; }
+  .np .top .from { flex: 1; text-align: center; }
+  .np .top .from small { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.1px; color: var(--text-secondary); }
+  .np .top .from span { font-size: 13px; font-weight: 600; }
+  .np .cover { width: 288px; height: 288px; margin: 8px auto 0; border-radius: var(--r-art); position: relative; flex: none;
+    box-shadow: 0 18px 44px rgba(255,140,90,.24), 0 2px 0 rgba(255,255,255,.06) inset; overflow: hidden; }
+  .np .cover::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle at 62% 58%, rgba(255,255,255,.07) 0 1px, rgba(255,255,255,0) 1px 13px); }
+  .np .cover b { position: absolute; left: 18px; bottom: 16px; font-size: 11px; letter-spacing: 3px; font-weight: 600; color: rgba(255,255,255,.82); }
+  .np .meta { padding: 18px 24px 0; }
+  .np .meta .t { font-size: 22px; line-height: 28px; font-weight: 600; }
+  .np .meta .a { font-size: 14px; line-height: 20px; color: var(--text-secondary); }
+  .np .pills { display: flex; align-items: center; gap: 6px; padding: 12px 24px 0; }
+  .chip { height: 26px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border-radius: 999px; background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.09); font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; font-feature-settings: "tnum"; }
+  .chip.on { color: var(--accent); border-color: rgba(255,179,107,.45); background: rgba(255,179,107,.10); }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--limit); box-shadow: 0 0 8px var(--limit); margin-left: 4px; }
+  .np .seek { padding: 18px 24px 0; }
+  .np .seek svg { display: block; width: 312px; height: 80px; }
+  .np .times { display: flex; justify-content: space-between; padding: 6px 24px 0; font-size: 13px; line-height: 16px; font-weight: 500; color: var(--text-secondary); font-feature-settings: "tnum"; }
+  .np .transport { height: 72px; margin-top: 14px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex: none; }
+  .np .transport .side { width: 48px; height: 48px; }
+  .np .transport .mid { width: 56px; height: 56px; }
+  .np .transport .mid svg.ic { width: 30px; height: 30px; }
+  .np .transport .play { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center;
+    box-shadow: 0 10px 28px rgba(255,160,80,.30); }
+  .np .transport .play svg.ic { width: 32px; height: 32px; }
+  .np .transport .active { color: var(--accent); }
+  .np .transport .active::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
+  .np .actions { height: 52px; margin-top: 14px; display: flex; justify-content: space-around; padding: 0 12px; flex: none; }
+  .np .actions div { width: 72px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+  .np .actions div.on { color: var(--accent); }
+
+  /* ---------- Equalizer ---------- */
+  .eq .top { height: 52px; flex: none; display: flex; align-items: center; padding: 0 16px 0 4px; }
+  .eq .top .title { font-size: 20px; font-weight: 600; flex: 1; margin-left: 2px; }
+  .switch { width: 52px; height: 30px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; background: var(--on-accent); }
+  .switch.off { background: var(--surface3); box-shadow: inset 0 0 0 1.5px var(--outline-strong); }
+  .switch.off::after { right: auto; left: 4px; background: var(--text-secondary); }
+  .moderow { height: 44px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .seg { display: inline-flex; background: var(--surface2); border-radius: 999px; padding: 3px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .seg span { padding: 6px 14px; border-radius: 999px; }
+  .seg span.on { background: var(--accent-dim); color: var(--accent); }
+  .moderow .preset { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; }
+  .moderow .preset svg.ic { width: 18px; height: 18px; color: var(--text-secondary); }
+  .moderow .save { font-size: 13px; font-weight: 600; color: var(--accent); margin-left: 6px; }
+  .profile { height: 22px; flex: none; padding: 0 16px; font-size: 12px; font-weight: 500; color: var(--text-tertiary); }
+  .profile b { color: var(--text-secondary); font-weight: 500; }
+  .graph { margin: 8px 16px 0; height: 170px; flex: none; background: var(--surface1); border: 1px solid var(--outline); border-radius: var(--r-card); position: relative; overflow: hidden; }
+  .graph svg { display: block; width: 100%; height: 100%; }
+  .meters { height: 18px; flex: none; padding: 7px 16px 0; display: flex; flex-direction: column; gap: 3px; }
+  .meters i { display: block; height: 3px; border-radius: 2px; background: var(--surface3); position: relative; overflow: hidden; }
+  .meters i::after { content: ""; position: absolute; inset: 0; right: var(--r, 30%); border-radius: 2px; background: linear-gradient(90deg, var(--positive) 0 72%, var(--wave-mid) 88%, var(--limit)); }
+  .chips { height: 40px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 16px; overflow: hidden; white-space: nowrap; }
+  .chips span { height: 28px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; background: var(--surface2); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .chips span.on { background: var(--accent-dim); color: var(--accent); }
+  .bandsel { height: 40px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .sliders { height: 186px; flex: none; display: flex; justify-content: space-between; padding: 6px 14px 0; }
+  .band { width: 28px; display: flex; flex-direction: column; align-items: center; }
+  .band .val { height: 16px; font-size: 10px; font-weight: 600; color: var(--text-secondary); font-feature-settings: "tnum"; }
+  .band .track { width: 4px; height: 132px; border-radius: 2px; background: var(--surface3); position: relative; margin-top: 4px; }
+  .band .track::before { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 1px; background: var(--outline-strong); }
+  .band .fill { position: absolute; left: 0; right: 0; border-radius: 2px; background: var(--accent); }
+  .band .knob { position: absolute; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px var(--bg), 0 2px 6px rgba(0,0,0,.5); }
+  .band .hz { margin-top: 12px; font-size: 10px; font-weight: 500; color: var(--text-tertiary); font-feature-settings: "tnum"; }
+  .prerow { height: 60px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-top: 1px solid var(--outline); margin-top: 4px; }
+  .prerow .lab { font-size: 13px; font-weight: 500; color: var(--text-secondary); width: 52px; }
+  .hs { flex: 1; height: 4px; border-radius: 2px; background: var(--surface3); position: relative; }
+  .hs .fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); }
+  .hs .knob { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px var(--bg), 0 2px 6px rgba(0,0,0,.5); }
+  .hs.auto .fill { background: var(--outline-strong); }
+  .hs.auto .knob { background: var(--text-secondary); }
+  .autochip { height: 28px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 999px; background: var(--accent-dim); color: var(--accent); font-size: 12px; font-weight: 600; font-feature-settings: "tnum"; white-space: nowrap; }
+  .limit { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; letter-spacing: .8px; color: var(--limit); }
+  .limit i { width: 8px; height: 8px; border-radius: 50%; background: var(--limit); box-shadow: 0 0 8px var(--limit); }
+  .morerow { height: 52px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; font-size: 14px; }
+  .morerow .lab { flex: none; width: 96px; color: var(--text); font-weight: 500; }
+  .morerow .v { margin-left: auto; color: var(--text-secondary); font-size: 13px; font-weight: 500; font-feature-settings: "tnum"; }
+  .knobs { height: 150px; flex: none; display: flex; justify-content: space-between; padding: 14px 16px 0; }
+  .kn { width: 70px; text-align: center; }
+  .kn svg { display: block; width: 70px; height: 70px; }
+  .kn .n { margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--text); }
+  .kn .d { font-size: 12px; font-weight: 500; color: var(--accent); font-feature-settings: "tnum"; }
+  .kn.zero .d { color: var(--text-tertiary); }
+
+  /* ---------- tokens strip ---------- */
+  .tokens { margin-top: 44px; display: flex; flex-wrap: wrap; gap: 28px 40px; align-items: flex-start; }
+  .tokens h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; color: var(--text-secondary); }
+  .sw { display: grid; grid-template-columns: repeat(6, 86px); gap: 8px; }
+  .sw div { height: 62px; border-radius: 10px; border: 1px solid #2a2d35; padding: 6px 8px; font-size: 10px; line-height: 13px; font-weight: 600; display: flex; flex-direction: column; justify-content: flex-end; }
+  .appicon { width: 96px; height: 96px; border-radius: 26px; background: #0B0C0F; box-shadow: 0 0 0 1px #2a2d35; display: grid; place-items: center; }
+  .states { display: flex; gap: 14px; align-items: center; }
+  .states .lbl { font-size: 11px; color: var(--text-secondary); text-align: center; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<h1>Trueform — UI reference</h1>
+<p class="lede">Visual reference for <code>docs/plan/04-ui-ux.md</code>. Four key screens at 360 × 780 dp, dark theme.
+The waveform and the equaliser curves are computed by the script at the bottom from the same rules the app uses
+(three-band colour mix, RBJ filters, corrected band gains, automatic preamp), so shapes and numbers are honest.
+CSS variables in <code>:root</code> are the design tokens.</p>
+
+<!-- icon sprites -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+    <symbol id="i-cast" viewBox="0 0 24 24"><path d="M3 18.5a2.5 2.5 0 0 1 2.5 2.5M3 14.5A6.5 6.5 0 0 1 9.5 21M3 10.5V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5.5"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8A.8.8 0 0 0 8 5.2z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4.4" height="15" rx="1.3"/><rect x="13.6" y="4.5" width="4.4" height="15" rx="1.3"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 5.6v12.8a.8.8 0 0 0 1.2.7L16 13V6z"/><path d="M5 5.6a.8.8 0 0 1 1.2-.7L16 11v2z"/><rect x="17" y="5" width="2.6" height="14" rx="1.2"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 5.6v12.8a.8.8 0 0 1-1.2.7L8 13V6z"/><path d="M19 5.6a.8.8 0 0 0-1.2-.7L8 11v2z"/><rect x="4.4" y="5" width="2.6" height="14" rx="1.2"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3.5 7H7l9.5 10H20M3.5 17H7l3-3.2M14 10.2L16.5 7H20M17.5 4.5L20 7l-2.5 2.5M17.5 14.5L20 17l-2.5 2.5"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M5 11.5V9.5a2.5 2.5 0 0 1 2.5-2.5H19M16 4l3 3-3 3M19 12.5v2a2.5 2.5 0 0 1-2.5 2.5H5M8 20l-3-3 3-3"/></symbol>
+    <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16"/><circle cx="6" cy="14.5" r="2.2" fill="#0B0C0F"/><circle cx="12" cy="8" r="2.2" fill="#0B0C0F"/><circle cx="18" cy="12.5" r="2.2" fill="#0B0C0F"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h6"/><path d="M15.5 13.5v6l4.8-3z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.8l2.4 1.6M9.8 3.5h4.4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2H9l2 2h7.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.2-5.1M5 4.5v3.5h3.5"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+
+  <!-- ============ 1. LIBRARY ============ -->
+  <figure>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span class="batt"></span></div>
+      <div class="topbar">
+        <span class="title">Rock</span>
+        <span class="update">Update · build 128</span>
+        <span class="spacer"></span>
+        <span class="iconbtn"><svg class="ic"><use href="#i-search"/></svg></span>
+        <span class="iconbtn"><svg class="ic"><use href="#i-cast"/></svg></span>
+        <span class="iconbtn pressed"><svg class="ic"><use href="#i-more"/></svg></span>
+      </div>
+      <div class="crumbs"><span class="c">Internal</span><span class="sep">›</span><span class="c">Music</span><span class="sep">›</span><span class="c cur">Rock</span></div>
+      <div class="tabs"><span class="on">Folders</span><span>Albums</span><span>Artists</span><span>Songs</span><span>Playlists</span></div>
+      <div class="folderhead">
+        <span class="pillbtn primary"><svg class="ic solid"><use href="#i-play"/></svg>Play</span>
+        <span class="pillbtn ghost"><svg class="ic"><use href="#i-shuffle"/></svg>Shuffle</span>
+        <span class="meta">348 songs · 22 h</span>
+      </div>
+      <div class="list">
+        <div class="row"><div class="thumb art-b"></div><div class="txt"><div class="t1">Echo Park Radio</div><div class="t2">6 folders · 62 songs</div></div></div>
+        <div class="row pressed"><div class="thumb art-c"></div><div class="txt"><div class="t1">Northern Static</div><div class="t2">9 folders · 81 songs</div></div></div>
+        <div class="row"><div class="thumb"><svg class="ic"><use href="#i-folder"/></svg></div><div class="txt"><div class="t1">Velvet Motor</div><div class="t2">12 folders · 140 songs</div></div></div>
+        <div class="row"><div class="thumb art-a"></div><div class="txt"><div class="t1">01 First Light</div><div class="t2">Northern Static · 1:12</div></div></div>
+        <div class="row playing"><div class="thumb art-a"></div><div class="txt"><div class="t1">02 Glass Harbor</div><div class="t2">Northern Static · 5:12</div></div><div class="trail"><span class="bars"><i></i><i></i><i></i></span></div></div>
+        <div class="row"><div class="thumb art-a"></div><div class="txt"><div class="t1">03 Low Tide Engines</div><div class="t2">Northern Static · 4:38</div></div><div class="trail"><span class="fmt">24/96</span></div></div>
+        <div class="row"><div class="thumb art-d"></div><div class="txt"><div class="t1">04 Paper Lanterns</div><div class="t2">Northern Static · 3:55</div></div></div>
+        <div class="row"><div class="thumb art-d"></div><div class="txt"><div class="t1">05 Signal Fires</div><div class="t2">Northern Static · 6:04</div></div><div class="trail"><span class="fmt">WMA</span></div></div>
+      </div>
+      <div class="mini">
+        <svg class="wave" id="miniWave" viewBox="0 0 360 64" preserveAspectRatio="none"></svg>
+        <div class="thumb art-a"></div>
+        <div class="txt" style="flex:1;min-width:0"><div class="t1">Glass Harbor</div><div class="t2">Northern Static</div></div>
+        <span class="iconbtn"><svg class="ic solid"><use href="#i-pause"/></svg></span>
+        <span class="iconbtn"><svg class="ic solid"><use href="#i-next"/></svg></span>
+      </div>
+      <div class="gesture" style="background:var(--surface1)"><i></i></div>
+    </div>
+    <figcaption><b>Library · Folders.</b> Breadcrumb chips, folder actions, subfolders then songs. The pressed
+      state (16% overlay) is shown on "Northern Static" and the overflow button. The mini player's background is
+      the track's waveform, so it doubles as progress.</figcaption>
+  </figure>
+
+  <!-- ============ 2. NOW PLAYING ============ -->
+  <figure>
+    <div class="phone np">
+      <div class="status"><span>9:41</span><span class="batt"></span></div>
+      <div class="top">
+        <span class="iconbtn"><svg class="ic"><use href="#i-down"/></svg></span>
+        <div class="from"><small>PLAYING FROM</small><span>Northern Static</span></div>
+        <span class="iconbtn"><svg class="ic"><use href="#i-cast"/></svg></span>
+        <span class="iconbtn"><svg class="ic"><use href="#i-more"/></svg></span>
+      </div>
+      <div class="cover art-a"><b>AFTERLIGHT</b></div>
+      <div class="meta"><div class="t">Glass Harbor</div><div class="a">Northern Static · Afterlight</div></div>
+      <div class="pills">
+        <span class="chip">FLAC · 24/96</span>
+        <span class="chip">→ WH-1000XM5</span>
+        <span class="chip on">EQ · Rock</span>
+        <span class="led" title="limiter active"></span>
+      </div>
+      <div class="seek"><svg id="seekWave" viewBox="0 0 312 80"></svg></div>
+      <div class="times"><span>2:11</span><span>−3:01</span></div>
+      <div class="transport">
+        <span class="iconbtn side active"><svg class="ic"><use href="#i-shuffle"/></svg></span>
+        <span class="iconbtn mid"><svg class="ic solid"><use href="#i-prev"/></svg></span>
+        <span class="play"><svg class="ic solid"><use href="#i-pause"/></svg></span>
+        <span class="iconbtn mid"><svg class="ic solid"><use href="#i-next"/></svg></span>
+        <span class="iconbtn side"><svg class="ic"><use href="#i-repeat"/></svg></span>
+      </div>
+      <div class="actions">
+        <div class="on"><svg class="ic"><use href="#i-eq"/></svg>Rock</div>
+        <div><svg class="ic"><use href="#i-queue"/></svg>Queue</div>
+        <div><svg class="ic"><use href="#i-timer"/></svg>Timer</div>
+        <div><svg class="ic"><use href="#i-more"/></svg>More</div>
+      </div>
+      <div class="gesture"><i></i></div>
+    </div>
+    <figcaption><b>Now Playing.</b> Backdrop and accent come from the artwork. The Trueform seekbar is the only
+      loud element: height is loudness, colour is bass (coral), mids (gold), treble (ice); played is bright, upcoming
+      is dim. The dot after the pills glows while the limiter works.</figcaption>
+  </figure>
+
+  <!-- ============ 3. EQUALIZER · GRAPHIC ============ -->
+  <figure>
+    <div class="phone eq">
+      <div class="status"><span>9:41</span><span class="batt"></span></div>
+      <div class="top">
+        <span class="iconbtn"><svg class="ic"><use href="#i-back"/></svg></span>
+        <span class="title">Equalizer</span>
+        <span class="switch"></span>
+      </div>
+      <div class="moderow">
+        <span class="seg"><span class="on">Graphic</span><span>Tone</span></span>
+        <span class="preset">Rock<svg class="ic"><use href="#i-down"/></svg></span>
+        <span class="iconbtn" style="width:36px;height:36px;color:var(--text-secondary)"><svg class="ic" style="width:20px;height:20px"><use href="#i-reset"/></svg></span>
+        <span class="save">Save</span>
+      </div>
+      <div class="profile">Profile: <b>Bluetooth · WH-1000XM5</b></div>
+      <div class="graph"><svg id="eqGraph" viewBox="0 0 328 170"></svg></div>
+      <div class="meters"><i style="--r:24%"></i><i style="--r:29%"></i></div>
+      <div class="chips"><span>Flat</span><span>Bass boost</span><span class="on">Rock</span><span>Pop</span><span>Jazz</span><span>Vocal</span></div>
+      <div class="bandsel">Bands <span class="seg"><span>5</span><span class="on">10</span><span>15</span><span>31</span></span></div>
+      <div class="sliders" id="eqSliders"></div>
+      <div class="prerow">
+        <span class="lab">Preamp</span>
+        <span class="hs auto" id="preSlider"><span class="fill"></span><span class="knob"></span></span>
+        <span class="autochip" id="autoChip">Auto</span>
+        <span class="limit"><i></i>LIMIT</span>
+      </div>
+      <div class="morerow" style="color:var(--text-secondary);font-size:13px;font-weight:500">▸ More: balance, mono, gain range</div>
+      <div style="flex:1"></div>
+      <div class="gesture"><i></i></div>
+    </div>
+    <figcaption><b>Equalizer · Graphic.</b> The curve is the real response of the filters in use; dragging on the
+      graph draws the curve across bands. Preamp is on Auto: its value is minus the curve's highest point, so a
+      boost never clips.</figcaption>
+  </figure>
+
+  <!-- ============ 4. EQUALIZER · TONE ============ -->
+  <figure>
+    <div class="phone eq">
+      <div class="status"><span>9:41</span><span class="batt"></span></div>
+      <div class="top">
+        <span class="iconbtn"><svg class="ic"><use href="#i-back"/></svg></span>
+        <span class="title">Equalizer</span>
+        <span class="switch"></span>
+      </div>
+      <div class="moderow">
+        <span class="seg"><span>Graphic</span><span class="on">Tone</span></span>
+        <span class="preset">Custom<svg class="ic"><use href="#i-down"/></svg></span>
+        <span class="iconbtn" style="width:36px;height:36px;color:var(--text-secondary)"><svg class="ic" style="width:20px;height:20px"><use href="#i-reset"/></svg></span>
+        <span class="save">Save</span>
+      </div>
+      <div class="profile">Profile: <b>Phone speaker</b></div>
+      <div class="graph"><svg id="toneGraph" viewBox="0 0 328 170"></svg></div>
+      <div class="meters"><i style="--r:34%"></i><i style="--r:31%"></i></div>
+      <div class="knobs" id="toneKnobs"></div>
+      <div class="prerow">
+        <span class="lab">Preamp</span>
+        <span class="hs auto" id="preSlider2"><span class="fill"></span><span class="knob"></span></span>
+        <span class="autochip" id="autoChip2">Auto</span>
+        <span class="limit" style="color:var(--text-tertiary)"><i style="background:var(--surface3);box-shadow:none"></i>LIMIT</span>
+      </div>
+      <div class="morerow"><span class="lab">Balance</span><span class="hs" style="flex:1"><span class="fill" style="left:50%;width:0"></span><span class="knob" style="left:50%"></span></span><span class="v" style="margin-left:0;width:44px;text-align:right">Centre</span></div>
+      <div class="morerow"><span class="lab">Mono</span><span class="v"></span><span class="switch off"></span></div>
+      <div class="morerow"><span class="lab">Gain range</span><span class="v">±12 dB</span></div>
+      <div style="flex:1"></div>
+      <div class="gesture"><i></i></div>
+    </div>
+    <figcaption><b>Equalizer · Tone.</b> Four knobs: sub-bass, bass, mid, treble. Same graph, same automatic preamp.
+      Knobs turn by vertical drag or around the rim, tick every dB, double-tap resets.</figcaption>
+  </figure>
+</div>
+
+<div class="tokens">
+  <div>
+    <h2>Colour tokens (dark)</h2>
+    <div class="sw" id="swatches"></div>
+  </div>
+  <div>
+    <h2>Launcher icon</h2>
+    <div class="appicon"><svg id="appIcon" width="64" height="64" viewBox="0 0 64 64"></svg></div>
+  </div>
+  <div>
+    <h2>States</h2>
+    <div class="states">
+      <div><span class="iconbtn" style="background:var(--surface2)"><svg class="ic"><use href="#i-shuffle"/></svg></span><div class="lbl">rest</div></div>
+      <div><span class="iconbtn" style="background:var(--surface2)"><svg class="ic"><use href="#i-shuffle"/></svg><i style="position:absolute;inset:0;border-radius:50%;background:var(--text);opacity:.08"></i></span><div class="lbl">hover 8%</div></div>
+      <div><span class="iconbtn pressed" style="background:var(--surface2);transform:scale(.97)"><svg class="ic"><use href="#i-shuffle"/></svg></span><div class="lbl">pressed 16%</div></div>
+      <div><span class="iconbtn focus" style="background:var(--surface2)"><svg class="ic"><use href="#i-shuffle"/></svg></span><div class="lbl">focus ring</div></div>
+      <div><span class="iconbtn" style="background:var(--accent-dim);color:var(--accent)"><svg class="ic"><use href="#i-shuffle"/></svg></span><div class="lbl">selected</div></div>
+      <div><span class="iconbtn" style="background:var(--surface2);opacity:.38"><svg class="ic"><use href="#i-shuffle"/></svg></span><div class="lbl">disabled</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+  // ---- colour helpers (mix in linear RGB, as the app does) ----
+  const toLin = h => [1, 3, 5].map(i => { const v = parseInt(h.substr(i, 2), 16) / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  const toHex = a => '#' + a.map(v => { const s = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; return Math.round(Math.max(0, Math.min(1, s)) * 255).toString(16).padStart(2, '0'); }).join('');
+  const LOW = toLin(css('--wave-low')), MID = toLin(css('--wave-mid')), HIGH = toLin(css('--wave-high'));
+  const mix3 = (l, m, h) => { const s = l + m + h || 1; return toHex([0, 1, 2].map(i => (LOW[i] * l + MID[i] * m + HIGH[i] * h) / s)); };
+
+  // ---- a deterministic fake track: level and band shares over time ----
+  function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const sm = t => t * t * (3 - 2 * t);
+  function trackAt(t) {
+    // [start, level, low, mid, high]
+    const S = [[0.00, .20, .10, .50, .40], [0.07, .46, .30, .55, .15], [0.27, .52, .30, .55, .15], [0.29, .92, .55, .25, .20],
+               [0.42, .88, .50, .22, .28], [0.44, .50, .28, .57, .15], [0.56, .46, .22, .62, .16], [0.58, .26, .08, .52, .40],
+               [0.65, .30, .06, .40, .54], [0.71, .62, .08, .30, .62], [0.725, .98, .60, .20, .20], [0.90, .94, .55, .22, .23],
+               [0.93, .42, .25, .55, .20], [1.00, .10, .15, .55, .30]];
+    let i = 0; while (i < S.length - 2 && t >= S[i + 1][0]) i++;
+    const a = S[i], b = S[i + 1], u = sm(Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0]))));
+    return [1, 2, 3, 4].map(k => lerp(a[k], b[k], u));
+  }
+
+  function waveform(svg, o) {
+    const r = rng(o.seed || 11), n = Math.floor((o.w + o.gap) / (o.bar + o.gap)), cy = o.mirror ? o.h * 0.62 : o.h - 1;
+    const up = cy - 2, down = o.h - cy - 3;
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n; let [lv, lo, mi, hi] = trackAt(t);
+      const beat = 0.5 + 0.5 * Math.sin(i * 1.9) * Math.sin(i * 0.7 + 1);
+      lv = Math.max(0.04, Math.min(1, lv * (0.80 + 0.26 * r()) + 0.06 * beat * lv));
+      lo *= 0.75 + 0.5 * r(); mi *= 0.75 + 0.5 * r(); hi *= 0.75 + 0.5 * r();
+      // SHARE_CONTRAST (docs/plan/05-waveform-seekbar.md): raise shares to a power so the dominant band sets the hue
+      lo = Math.pow(lo, 2.2); mi = Math.pow(mi, 2.2); hi = Math.pow(hi, 2.2);
+      const tip = Math.min(1, lv + 0.07 + 0.12 * r());
+      const x = i * (o.bar + o.gap), col = o.mono || mix3(lo, mi, hi), played = t <= o.played;
+      const a = played ? 1 : (o.dim == null ? 0.38 : o.dim);
+      const hBody = Math.max(1.5, lv * up), hTip = tip * up;
+      el('rect', { x, y: cy - hTip, width: o.bar, height: hTip, rx: o.bar / 2, fill: col, opacity: a * 0.35 }, svg);
+      el('rect', { x, y: cy - hBody, width: o.bar, height: hBody, rx: o.bar / 2, fill: col, opacity: a }, svg);
+      if (o.mirror) el('rect', { x, y: cy + 1.5, width: o.bar, height: Math.max(1, hBody * 0.6 * (down / (up * 0.6))) , rx: o.bar / 2, fill: col, opacity: a * 0.45 }, svg);
+    }
+    if (o.playhead) {
+      const px = Math.round(o.played * o.w);
+      el('rect', { x: px - 1, y: 0, width: 2, height: o.h, rx: 1, fill: css('--text') }, svg);
+    }
+  }
+  waveform(document.getElementById('seekWave'), { w: 312, h: 80, bar: 2, gap: 1, played: 0.42, mirror: true, playhead: true });
+  waveform(document.getElementById('miniWave'), { w: 360, h: 64, bar: 4, gap: 2, played: 0.42, mirror: false, dim: 0.30 });
+
+  // ---- filters (RBJ cookbook) and their response ----
+  const FS = 48000;
+  function peaking(f0, g, Q) { const A = Math.pow(10, g / 40), w = 2 * Math.PI * f0 / FS, al = Math.sin(w) / (2 * Q), c = Math.cos(w), a0 = 1 + al / A;
+    return { b0: (1 + al * A) / a0, b1: -2 * c / a0, b2: (1 - al * A) / a0, a1: -2 * c / a0, a2: (1 - al / A) / a0 }; }
+  function highShelf(f0, g, Q) { const A = Math.pow(10, g / 40), w = 2 * Math.PI * f0 / FS, al = Math.sin(w) / (2 * Q), c = Math.cos(w), s = 2 * Math.sqrt(A) * al, a0 = (A + 1) - (A - 1) * c + s;
+    return { b0: A * ((A + 1) + (A - 1) * c + s) / a0, b1: -2 * A * ((A - 1) + (A + 1) * c) / a0, b2: A * ((A + 1) + (A - 1) * c - s) / a0, a1: 2 * ((A - 1) - (A + 1) * c) / a0, a2: ((A + 1) - (A - 1) * c - s) / a0 }; }
+  function magDb(k, f) { const w = 2 * Math.PI * f / FS, c1 = Math.cos(w), c2 = Math.cos(2 * w);
+    const num = k.b0 * k.b0 + k.b1 * k.b1 + k.b2 * k.b2 + 2 * (k.b0 * k.b1 + k.b1 * k.b2) * c1 + 2 * k.b0 * k.b2 * c2;
+    const den = 1 + k.a1 * k.a1 + k.a2 * k.a2 + 2 * (k.a1 + k.a1 * k.a2) * c1 + 2 * k.a2 * c2; return 10 * Math.log10(num / den); }
+  const respDb = (fl, f) => fl.reduce((s, k) => s + magDb(k, f), 0);
+  function corrected(freqs, target, Q) { let g = target.slice();
+    for (let it = 0; it < 4; it++) { const fl = freqs.map((f, i) => peaking(f, g[i], Q)); const act = freqs.map(f => respDb(fl, f));
+      g = g.map((v, i) => Math.max(-18, Math.min(18, v + 0.8 * (target[i] - act[i])))); } return g; }
+  function autoPreamp(fl, extra) { let m = 0; for (let i = 0; i < 256; i++) { const f = 10 * Math.pow(2200, i / 255); m = Math.max(m, respDb(fl, f)); } (extra || []).forEach(f => m = Math.max(m, respDb(fl, f))); return -Math.ceil(m * 10) / 10; }
+
+  function graph(svg, fl, dots) {
+    const W = 328, H = 170, L = 30, R = 10, T = 12, B = 22, pw = W - L - R, ph = H - T - B, range = 12;
+    const X = f => L + pw * Math.log(f / 20) / Math.log(1000), Y = d => T + ph / 2 - (d / range) * (ph / 2);
+    const g = el('g', { 'font-family': 'inherit', 'font-size': 9.5, 'font-weight': 500, fill: css('--text-tertiary') }, svg);
+    [-12, -6, 0, 6, 12].forEach(d => { el('line', { x1: L, x2: W - R, y1: Y(d), y2: Y(d), stroke: d === 0 ? css('--outline-strong') : css('--outline'), 'stroke-width': 1 }, g);
+      if (d % 12 === 0) { const t = el('text', { x: L - 6, y: Y(d) + 3.5, 'text-anchor': 'end' }, g); t.textContent = (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d); } });
+    [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach(f => { const major = [20, 100, 1000, 10000, 20000].includes(f);
+      el('line', { x1: X(f), x2: X(f), y1: T, y2: T + ph, stroke: css('--outline'), 'stroke-width': 1, opacity: major ? 1 : 0.45 }, g);
+      if (major) { const t = el('text', { x: X(f), y: H - 7, 'text-anchor': f === 20 ? 'start' : f === 20000 ? 'end' : 'middle' }, g); t.textContent = f >= 1000 ? (f / 1000) + 'k' : f; } });
+    const defs = el('defs', {}, svg), id = svg.id + 'g', lg = el('linearGradient', { id, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+    [[0, '--wave-low'], [0.5, '--wave-mid'], [1, '--wave-high']].forEach(([o, c]) => el('stop', { offset: o, 'stop-color': css(c) }, lg));
+    let line = '', area = `M${L},${Y(0)}`;
+    for (let x = 0; x <= pw; x += 2) { const f = 20 * Math.pow(1000, x / pw), y = Y(Math.max(-range, Math.min(range, respDb(fl, f)))); line += (x ? 'L' : 'M') + (L + x) + ',' + y.toFixed(1); area += 'L' + (L + x) + ',' + y.toFixed(1); }
+    area += `L${L + pw},${Y(0)}Z`;
+    el('path', { d: area, fill: `url(#${id})`, opacity: 0.26 }, svg);
+    el('path', { d: line, fill: 'none', stroke: css('--accent'), 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+    (dots || []).forEach(f => el('circle', { cx: X(f), cy: Y(respDb(fl, f)), r: 3, fill: css('--surface1'), stroke: css('--accent'), 'stroke-width': 1.6 }, svg));
+  }
+  const fmtDb = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
+  function preamp(sliderId, chipId, db) { const s = document.getElementById(sliderId), p = (db + 15) / 30 * 100;
+    s.querySelector('.fill').style.cssText = `left:${Math.min(p, 50)}%;width:${Math.abs(50 - p)}%`; s.querySelector('.knob').style.left = p + '%';
+    document.getElementById(chipId).textContent = 'Auto ' + fmtDb(db) + ' dB'; }
+
+  // ---- graphic EQ: "Rock" on 10 bands ----
+  const F10 = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000], ROCK = [4.5, 3.5, 2, 0, -1.5, -1, 1, 2.5, 3.5, 4], Q10 = Math.SQRT2;
+  const g10 = corrected(F10, ROCK, Q10), fl10 = F10.map((f, i) => peaking(f, g10[i], Q10));
+  graph(document.getElementById('eqGraph'), fl10, F10);
+  preamp('preSlider', 'autoChip', autoPreamp(fl10, F10));
+  const sl = document.getElementById('eqSliders'), lab = ['31', '63', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
+  ROCK.forEach((v, i) => { const p = 50 - v / 12 * 50, d = document.createElement('div'); d.className = 'band';
+    d.innerHTML = `<div class="val">${v === 0 ? '0' : fmtDb(v)}</div><div class="track"><div class="fill" style="top:${Math.min(p, 50)}%;height:${Math.abs(50 - p)}%"></div><div class="knob" style="top:${p}%"></div></div><div class="hz">${lab[i]}</div>`;
+    sl.appendChild(d); });
+
+  // ---- tone mode ----
+  const TONE = [['Sub-bass', 3], ['Bass', 5], ['Mid', 0], ['Treble', 2]];
+  const flT = [peaking(45, TONE[0][1], 0.8), peaking(120, TONE[1][1], 0.8), peaking(1000, TONE[2][1], 0.6), highShelf(6500, TONE[3][1], 0.7)];
+  graph(document.getElementById('toneGraph'), flT);
+  preamp('preSlider2', 'autoChip2', autoPreamp(flT));
+  const kn = document.getElementById('toneKnobs');
+  const pt = (r, deg) => { const a = deg * Math.PI / 180; return [35 + r * Math.sin(a), 35 - r * Math.cos(a)]; };
+  const arc = (r, a0, a1) => { const [x0, y0] = pt(r, a0), [x1, y1] = pt(r, a1); return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} ${a1 > a0 ? 1 : 0} ${x1.toFixed(2)},${y1.toFixed(2)}`; };
+  TONE.forEach(([name, v]) => { const d = document.createElement('div'); d.className = 'kn' + (v === 0 ? ' zero' : ''); const ang = v / 12 * 135;
+    const s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', '0 0 70 70');
+    el('path', { d: arc(31, -135, 135), fill: 'none', stroke: css('--surface3'), 'stroke-width': 4, 'stroke-linecap': 'round' }, s);
+    if (v !== 0) el('path', { d: arc(31, Math.min(0, ang), Math.max(0, ang)), fill: 'none', stroke: css('--accent'), 'stroke-width': 4, 'stroke-linecap': 'round' }, s);
+    el('circle', { cx: 35, cy: 35, r: 23, fill: css('--surface2'), stroke: css('--outline-strong'), 'stroke-width': 1 }, s);
+    el('circle', { cx: 35, cy: 35, r: 23, fill: 'none', stroke: 'rgba(255,255,255,.06)', 'stroke-width': 1, transform: 'translate(0,-0.6)' }, s);
+    const [x0, y0] = pt(9, ang), [x1, y1] = pt(18, ang);
+    el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: v === 0 ? css('--text-secondary') : css('--accent'), 'stroke-width': 3, 'stroke-linecap': 'round' }, s);
+    const [tx, ty] = pt(31, 0); el('circle', { cx: tx, cy: ty, r: 1.4, fill: css('--text-tertiary') }, s);
+    d.appendChild(s); d.insertAdjacentHTML('beforeend', `<div class="n">${name}</div><div class="d">${v === 0 ? '0.0' : fmtDb(v)} dB</div>`); kn.appendChild(d); });
+
+  // ---- token swatches ----
+  const sw = document.getElementById('swatches');
+  ['bg', 'surface1', 'surface2', 'surface3', 'outline', 'outline-strong', 'text', 'text-secondary', 'text-tertiary', 'accent', 'accent-dim', 'on-accent',
+   'wave-low', 'wave-mid', 'wave-high', 'positive', 'danger', 'limit'].forEach(n => { const v = css('--' + n), d = document.createElement('div'), l = toLin(v);
+    const lum = 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]; d.style.background = v; d.style.color = lum > 0.35 ? '#111' : '#eee'; d.innerHTML = n + '<br>' + v.toUpperCase(); sw.appendChild(d); });
+
+  // ---- launcher icon: seven bars, coral → gold → ice ----
+  const ic = document.getElementById('appIcon'), hs = [14, 26, 40, 52, 36, 24, 12];
+  hs.forEach((h, i) => { const t = i / 6, col = t < 0.5 ? mix3(1 - t * 2, t * 2, 0) : mix3(0, 2 - t * 2, t * 2 - 1);
+    el('rect', { x: 5 + i * 8, y: 32 - h / 2, width: 5, height: h, rx: 2.5, fill: col }, ic); });
+})();
+</script>
+</body>
+</html>

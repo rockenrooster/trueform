@@ -1,0 +1,26 @@
+# Build output
+/.gradle/
+/build/
+/app/build/
+/app/.cxx/
+/.kotlin/
+/local.properties
+
+# Built by scripts/build-ffmpeg.sh
+/third_party/ffmpeg/
+
+# The release key: never committed, the repository is public
+/keys/
+*.keystore
+*.jks
+*.p12
+*.pfx
+
+# Device serials stay on this PC
+/scripts/devices.local.ps1
+
+# Local tooling and captures
+/captures/
+/.idea/
+*.iml
+*.log

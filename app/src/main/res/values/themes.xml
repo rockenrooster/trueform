@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat parent: the Cast route dialogs (MediaRouter) read AppCompat attributes and need an opaque
+         colorPrimary. Everything else is drawn by Compose. -->
+    <style name="Theme.Trueform" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">#FFB547</item>
+        <item name="colorPrimaryDark">#0B0C0F</item>
+        <item name="colorAccent">#FFB547</item>
+        <item name="android:windowBackground">#FF0B0C0F</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
