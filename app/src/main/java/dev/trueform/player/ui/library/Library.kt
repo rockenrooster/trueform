@@ -1,9 +1,13 @@
 package dev.trueform.player.ui.library
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -82,6 +90,7 @@ import dev.trueform.player.ui.sheets.SheetKind
 import dev.trueform.player.ui.sheets.UpdatePill
 import dev.trueform.player.ui.theme.Tf
 import dev.trueform.player.ui.theme.tfClickable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,8 +114,13 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
     }
     val title = if (tab == "folders") ancestry.lastOrNull()?.name ?: "Library" else TAB_LABELS[tab] ?: "Library"
     val scan by g.scanner.progress.collectAsState()
+    val scope = rememberCoroutineScope()
+    val swipe = remember { Animatable(0f) }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    Column(Modifier.fillMaxSize()
+        .then(if (folderId != null) Modifier.edgeSwipeUp(swipe, scope) { actions.back() } else Modifier)
+        .graphicsLayer { translationX = swipe.value }
+        .statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (folderId != null) 4.dp else 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             if (folderId != null) IconBtn(TfIcons.Back, "Up one folder") { actions.back() }
@@ -133,6 +147,39 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
         }
     }
 }
+
+/**
+ * Swipe in from the left edge (the finger moving right) to go up one folder: the folder follows the finger, then goes
+ * past a third of the width or on a fling, else springs back. The edge strip is claimed before the rows see the touch,
+ * so song rows keep their own swipes (right: play next, left: add to queue) and a vertical move still scrolls.
+ */
+private fun Modifier.edgeSwipeUp(offset: Animatable<Float, AnimationVector1D>, scope: CoroutineScope, onUp: () -> Unit): Modifier =
+    pointerInput(Unit) {
+        val edge = 40.dp.toPx()
+        val slop = viewConfiguration.touchSlop
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.position.x > edge) return@awaitEachGesture
+            val velocity = VelocityTracker()
+            var dragging = false
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) break
+                val dx = change.position.x - down.position.x
+                if (!dragging) {
+                    if (abs(change.position.y - down.position.y) > slop && abs(change.position.y - down.position.y) >= abs(dx)) return@awaitEachGesture
+                    if (dx <= slop) continue
+                    dragging = true
+                }
+                change.consume()
+                velocity.addPosition(change.uptimeMillis, change.position)
+                scope.launch { offset.snapTo((dx - slop).coerceAtLeast(0f)) }
+            }
+            if (!dragging) return@awaitEachGesture
+            if (offset.value > size.width / 3f || velocity.calculateVelocity().x > 1200f) onUp()
+            else scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f)) }
+        }
+    }
 
 @Composable
 private fun ScanLine(p: Scanner.Progress) {

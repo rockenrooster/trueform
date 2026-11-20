@@ -1,7 +1,7 @@
 package dev.trueform.player.ui.components
 
 import android.graphics.Bitmap
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
@@ -210,10 +213,18 @@ fun ArtImage(key: ArtKey?, seed: String, modifier: Modifier = Modifier, large: B
         }
         tried = true
     }
+    // A picture that arrives after the first frame fades in over the placeholder, alpha applied per drawing (no
+    // offscreen copy per row, unlike Crossfade); one already in memory shows at once.
+    val shown = remember(cacheKey) { Animatable(if (bmp != null) 1f else 0f) }
+    LaunchedEffect(bmp) { if (bmp != null) shown.animateTo(1f, tween(200)) }
+    val placeholder by remember(cacheKey) { derivedStateOf { bmp == null || shown.value < 1f } }
     Box(modifier.clip(RoundedCornerShape(radius))) {
-        Crossfade(bmp, animationSpec = tween(200), label = "art") { b: Bitmap? ->
-            if (b != null) Image(b.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            else Placeholder(seed, fallbackIcon, showLetter = tried)
+        if (placeholder) Placeholder(seed, fallbackIcon, showLetter = tried)
+        bmp?.let { b ->
+            Image(b.asImageBitmap(), null, Modifier.fillMaxSize().graphicsLayer {
+                alpha = shown.value
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }, contentScale = ContentScale.Crop)
         }
     }
 }

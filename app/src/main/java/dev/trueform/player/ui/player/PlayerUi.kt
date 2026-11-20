@@ -80,11 +80,34 @@ class PlayerUi(private val g: AppGraph, scope: CoroutineScope) : Player.Listener
         }
     }
 
-    fun next() = p.seekToNext()
+    fun next() {
+        mark(1)
+        p.seekToNext()
+    }
 
     fun previous() {
+        mark(-1)
         if (g.settings[S.previousRestarts]) p.seekToPrevious() else p.seekToPreviousMediaItem()
     }
+
+    /** A swipe back always means the previous track (never "restart this one"). */
+    fun previousTrack() {
+        mark(-1)
+        p.seekToPreviousMediaItem()
+    }
+
+    fun canGoNext() = p.hasNextMediaItem()
+    fun canGoBack() = p.hasPreviousMediaItem()
+
+    private var intent = 1
+    private var intentAt = 0L
+    private fun mark(direction: Int) { intent = direction; intentAt = SystemClock.elapsedRealtime() }
+
+    /**
+     * Which way a track change happening now slides: back after "previous" from this screen in the last 2 s, forwards
+     * otherwise (next, auto-advance, a pick from the queue).
+     */
+    fun direction(): Int = if (SystemClock.elapsedRealtime() - intentAt < 2000) intent else 1
 
     fun seek(ms: Long) {
         p.seekTo(ms)

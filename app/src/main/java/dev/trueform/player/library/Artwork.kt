@@ -35,21 +35,20 @@ class Artwork(private val context: Context, private val repo: LibraryRepo, priva
 
     fun cached(key: String): Bitmap? = memory.get(key)
 
-    suspend fun track(trackId: Long, size: Int): Bitmap? {
-        val key = "t${trackId}_$size"
-        memory.get(key)?.let { return it }
-        return withContext(io) {
-            val f = trackFile(trackId, size) ?: return@withContext null
-            decodeFile(f)?.also { memory.put(key, it) }
-        }
-    }
+    suspend fun track(trackId: Long, size: Int): Bitmap? = load("t${trackId}_$size") { trackFile(trackId, size) }
 
-    suspend fun folder(folderId: Long, size: Int): Bitmap? {
-        val key = "f${folderId}_$size"
+    suspend fun folder(folderId: Long, size: Int): Bitmap? = load("f${folderId}_$size") { folderFile(folderId, size) }
+
+    /** From memory, else the cache file (made on first use); a file that does not decode is made again once. */
+    private suspend fun load(key: String, file: () -> File?): Bitmap? {
         memory.get(key)?.let { return it }
         return withContext(io) {
-            val f = folderFile(folderId, size) ?: return@withContext null
-            decodeFile(f)?.also { memory.put(key, it) }
+            repeat(2) {
+                val f = file() ?: return@withContext null
+                decodeFile(f)?.let { memory.put(key, it); return@withContext it }
+                f.delete()   // damaged: written by an older build while another request wrote the same file
+            }
+            null
         }
     }
 
@@ -110,14 +109,20 @@ class Artwork(private val context: Context, private val repo: LibraryRepo, priva
         val scale = size.toFloat() / maxOf(src.width, src.height)
         val out = if (scale < 1f) Bitmap.createScaledBitmap(src, (src.width * scale).toInt().coerceAtLeast(1),
             (src.height * scale).toInt().coerceAtLeast(1), true) else src
-        val tmp = File(target.path + ".tmp")
+        // Its own temporary file: the player and the system (the notification's artwork, through ArtProvider) often
+        // ask for the same large picture at the same moment of a track change. A shared one made one of them fail, or
+        // left a damaged file, and the player showed the placeholder for good.
+        val tmp = File.createTempFile(target.name, ".tmp", dir)
         tmp.outputStream().use { out.compress(Bitmap.CompressFormat.WEBP_LOSSY, if (size >= 1024) 88 else 82, it) }
         if (out !== src) src.recycle()
         out.recycle()
-        return if (tmp.renameTo(target)) target else null
+        if (tmp.renameTo(target)) return target
+        tmp.delete()
+        return target.takeIf { it.exists() }
     }
 
-    private fun decodeFile(f: File): Bitmap? = runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull()
+    /** Decoded off the main thread and handed to the GPU ahead of its first frame (no upload stall while scrolling). */
+    private fun decodeFile(f: File): Bitmap? = runCatching { BitmapFactory.decodeFile(f.path)?.also { it.prepareToDraw() } }.getOrNull()
 
     private fun hashOf(bytes: ByteArray): String {
         val md = MessageDigest.getInstance("SHA-1")

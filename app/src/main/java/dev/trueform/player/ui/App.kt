@@ -41,6 +41,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -182,7 +183,11 @@ private fun Main(g: AppGraph) {
             }
         }
     }
-    BackHandler(enabled = sheet != null || expand.value > 0.5f || nav.stack.size > 1) { back() }
+    // Read the player's position through these (or in layout and drawing): reading expand.value here would recompose
+    // the whole app on every frame of opening, closing or dragging the player.
+    val playerOpen by remember { derivedStateOf { expand.value > 0.5f } }
+    val playerShown by remember { derivedStateOf { expand.value > 0.001f } }
+    BackHandler(enabled = sheet != null || playerOpen || nav.stack.size > 1) { back() }
 
     val actions = remember {
         object : UiActions {
@@ -227,7 +232,8 @@ private fun Main(g: AppGraph) {
         val panel = minOf(480.dp, maxWidth * 0.42f)
         val wide = maxWidth >= 840.dp && maxHeight >= 600.dp && ui.hasMedia && ui.track != null   // not a phone on its side
         Row(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).fillMaxHeight()) {
+        // not drawn while the open player covers it
+        Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = if (!wide && expand.value > 0.999f) 0f else 1f }) {
             Box(Modifier.weight(1f)) {
                 AnimatedContent(
                     nav.top,
@@ -252,7 +258,7 @@ private fun Main(g: AppGraph) {
                 }
             }
             if (ui.hasMedia && ui.track != null && !wide) {
-                Box(Modifier.fillMaxWidth().alpha(1f - expand.value).draggable(
+                Box(Modifier.fillMaxWidth().graphicsLayer { alpha = 1f - expand.value }.draggable(
                     rememberDraggableState { d -> scope.launch { expand.snapTo((expand.value - d / fullPx).coerceIn(0f, 1f)) } },
                     Orientation.Vertical,
                     onDragStopped = { v -> if (v < -600f || expand.value > 0.25f) openPlayer() else closePlayer() },
@@ -264,7 +270,7 @@ private fun Main(g: AppGraph) {
         }
         if (wide) Box(Modifier.width(panel).fillMaxHeight().background(Tf.colors.surface1)) { player() }
         }
-        if (expand.value > 0.001f && !wide) {
+        if (playerShown && !wide) {
             Box(Modifier.fillMaxSize()
                 .offset { IntOffset(0, ((1f - expand.value) * fullPx).roundToInt()) }
                 .draggable(

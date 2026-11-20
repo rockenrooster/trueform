@@ -61,7 +61,7 @@ class DebugReceiver : BroadcastReceiver() {
                 }
                 if (ids.isEmpty()) Log.w(TAG, "nothing in the library at $path") else g.queue.play(ids, 0, source)
             }
-            "play" -> { g.controller(); p.play() }
+            "play" -> { g.controller(); if (p.playbackState == Player.STATE_IDLE) p.prepare(); p.play() }   // a restored queue starts idle
             "pause" -> p.pause()
             "next" -> p.seekToNext()
             "prev" -> p.seekToPrevious()

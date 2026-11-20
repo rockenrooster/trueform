@@ -1,6 +1,26 @@
 package dev.trueform.player.ui.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.State
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import dev.trueform.player.ui.theme.LocalHaptics
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -41,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -84,7 +105,7 @@ fun rememberArtColors(trackId: Long?): ArtColors? {
     LaunchedEffect(trackId, enabled, c.isDark) {
         if (!enabled || trackId == null) { colors = null; return@LaunchedEffect }
         val bmp = g.artwork.track(trackId, 256) ?: run { colors = null; return@LaunchedEffect }
-        val p = Palette.from(bmp).generate()
+        val p = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Palette.from(bmp).generate() }
         val vib = p.vibrantSwatch ?: p.lightVibrantSwatch ?: p.mutedSwatch
         val dark = p.darkMutedSwatch ?: p.darkVibrantSwatch
         var accent = vib?.let { Color(it.rgb) } ?: c.accent
@@ -100,7 +121,85 @@ fun rememberArtColors(trackId: Long?): ArtColors? {
 
 fun mixColor(a: Color, b: Color, t: Float) = Color(a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t)
 
-/** The 64 dp mini player: art, title, play/pause, next; the track's waveform is its background and progress. */
+/**
+ * A sideways swipe between tracks: the current track's content follows the finger (with resistance where there is no
+ * track to go to); past about a quarter of the width it changes track and the content keeps going the way it was
+ * swiped while the new one slides in from the other side; otherwise it springs back.
+ */
+private class TrackSwipe(val scope: CoroutineScope) {
+    val drag = Animatable(0f)
+    /** Where the outgoing track's content starts its slide from (the drag at release), for the track swiped away. */
+    var exit by mutableFloatStateOf(0f)
+    var exitId by mutableStateOf<Long?>(null)
+    /** The track the drag belongs to. */
+    var owner by mutableStateOf<Long?>(null)
+
+    fun offset(id: Long?, current: Long?): Float = when {
+        id != current -> if (id == exitId) exit else 0f
+        id == owner -> drag.value
+        else -> 0f
+    }
+}
+
+@Composable
+private fun rememberTrackSwipe(trackId: Long?): TrackSwipe {
+    val scope = rememberCoroutineScope()
+    val s = remember { TrackSwipe(scope) }
+    LaunchedEffect(trackId) {
+        if (s.owner != trackId) s.drag.snapTo(0f)
+        kotlinx.coroutines.delay(400)   // the slide is over: a later change by button starts from the middle
+        s.exitId = null
+    }
+    return s
+}
+
+private fun Modifier.trackSwipe(s: TrackSwipe, ui: PlayerUi, trackId: Long?, onCommit: () -> Unit): Modifier =
+    pointerInput(trackId) {
+        detectHorizontalDragGestures(
+            onDragStart = { s.owner = trackId },
+            onDragEnd = {
+                val d = s.drag.value
+                val possible = if (d < 0) ui.canGoNext() else ui.canGoBack()
+                if (possible && abs(d) > size.width * 0.22f) {
+                    s.exit = d
+                    s.exitId = trackId
+                    onCommit()
+                    if (d < 0) ui.next() else ui.previousTrack()
+                    s.scope.launch {   // the track did not change after all: come back
+                        kotlinx.coroutines.delay(800)
+                        if (ui.track?.id == trackId) s.drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 400f))
+                    }
+                } else s.scope.launch { s.drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f)) }
+            },
+            onDragCancel = { s.scope.launch { s.drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f)) } },
+            onHorizontalDrag = { change, amount ->
+                change.consume()
+                val free = if (s.drag.value + amount < 0) ui.canGoNext() else ui.canGoBack()
+                s.scope.launch { s.drag.snapTo(s.drag.value + if (free) amount else amount * 0.3f) }
+            },
+        )
+    }
+
+/**
+ * Track changes slide: [dir] 1 = to the next track (the new one comes in from the right), -1 = back. Without [fade]
+ * the content fades itself (see [fadeCheaply]).
+ */
+private fun <T> AnimatedContentTransitionScope<T>.slideTransition(dir: Int, fraction: Float, clip: Boolean = false, fade: Boolean = true): ContentTransform {
+    val slideIn = slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { w -> (w * fraction * dir).toInt() }
+    val slideOut = slideOutHorizontally(tween(340, easing = FastOutSlowInEasing)) { w -> (-w * fraction * dir).toInt() }
+    return (if (fade) slideIn + fadeIn(tween(240)) else slideIn) togetherWith (if (fade) slideOut + fadeOut(tween(220)) else slideOut) using
+        SizeTransform(clip = clip)
+}
+
+/**
+ * The fade of a track change applied to each drawing (alpha on every draw, no offscreen copy): the transition's own
+ * fade draws the large artwork and its shadow into an offscreen buffer every frame, which slow GPUs cannot keep up with.
+ */
+@Composable
+private fun AnimatedVisibilityScope.fadeCheaply(): State<Float> =
+    transition.animateFloat({ tween(240) }, label = "fade") { if (it == EnterExitState.Visible) 1f else 0f }
+
+/** The 64 dp mini player: art, title, previous, play/pause, next; the track's waveform is its background and progress. */
 @UnstableApi
 @Composable
 fun MiniPlayer(ui: PlayerUi, onExpand: () -> Unit, modifier: Modifier = Modifier) {
@@ -108,26 +207,33 @@ fun MiniPlayer(ui: PlayerUi, onExpand: () -> Unit, modifier: Modifier = Modifier
     val c = Tf.colors
     val t = ui.track ?: return
     val wave by remember(t.id) { g.waveforms.observe(t.id) }.collectAsState()
-    val swipe by g.settings.flow(S.swipeMini).collectAsState(g.settings[S.swipeMini])
-    var dragged by remember { mutableStateOf(0f) }
+    val swipeOn by g.settings.flow(S.swipeMini).collectAsState(g.settings[S.swipeMini])
+    val swipe = rememberTrackSwipe(t.id)
+    val dir = remember(t.id) { ui.direction() }
+    val haptic = LocalHapticFeedback.current
+    val hapticsOn = LocalHaptics.current
     Box(
         modifier.fillMaxWidth().height(64.dp).background(c.surface1)
-            .then(if (swipe) Modifier.pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { if (abs(dragged) > 120) { if (dragged < 0) ui.next() else ui.previous() }; dragged = 0f },
-                    onHorizontalDrag = { ch, a -> ch.consume(); dragged += a })
+            .then(if (swipeOn) Modifier.trackSwipe(swipe, ui, t.id) {
+                if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } else Modifier)
             .tfClickable(label = "Open the player", onClick = onExpand),
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.outline))
         WaveSeekbar(wave, ui.durationMs, ui::position, ui.isPlaying, {}, Modifier.fillMaxSize().alpha(0.38f), height = 64.dp, compact = true)
-        Row(Modifier.fillMaxSize().padding(start = 10.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ArtImage(ArtKey.Track(t.id), t.album.ifBlank { t.displayTitle }, Modifier.size(44.dp))
-            Column(Modifier.weight(1f)) {
-                T(t.displayTitle, Tf.type.rowTitle.copy(fontSize = 15.sp, lineHeight = 20.sp))
-                T(t.displayArtist, Tf.type.caption, c.textSecondary)
+        Row(Modifier.fillMaxSize().padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            AnimatedContent(t, Modifier.weight(1f), contentKey = { it.id }, transitionSpec = { slideTransition(dir, 0.6f, clip = true) },
+                label = "mini") { track ->
+                Row(Modifier.fillMaxWidth().graphicsLayer { translationX = swipe.offset(track.id, t.id) },
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ArtImage(ArtKey.Track(track.id), track.album.ifBlank { track.displayTitle }, Modifier.size(44.dp))
+                    Column(Modifier.weight(1f)) {
+                        T(track.displayTitle, Tf.type.rowTitle.copy(fontSize = 15.sp, lineHeight = 20.sp))
+                        T(track.displayArtist, Tf.type.caption, c.textSecondary)
+                    }
+                }
             }
+            IconBtn(TfIcons.Prev, "Previous") { ui.previous() }
             IconBtn(if (ui.playWhenReady) TfIcons.Pause else TfIcons.Play, if (ui.playWhenReady) "Pause" else "Play", haptic = true) { ui.playPause() }
             IconBtn(TfIcons.Next, "Next") { ui.next() }
         }
@@ -155,8 +261,10 @@ fun NowPlaying(
     val q by g.queue.state.collectAsState()
     val eq by g.dsp.state.collectAsState()
     val art = rememberArtColors(t?.id)
-    val accent by animateColorAsState(art?.accent ?: c.accent, tween(500), label = "accent")
-    val backdrop by animateColorAsState(art?.backdrop ?: c.bg, tween(500), label = "backdrop")
+    // The accent changes with the track (no animation: animating it recomposed the whole player every frame while
+    // the artwork slid); the backdrop fades, read only when drawing.
+    val accent = art?.accent ?: c.accent
+    val backdrop = animateColorAsState(art?.backdrop ?: c.bg, tween(500), label = "backdrop")
     val bgMode by g.settings.flow(S.playerBackground).collectAsState(g.settings[S.playerBackground])
     val wave by remember(t?.id) { t?.let { g.waveforms.observe(it.id) } ?: kotlinx.coroutines.flow.MutableStateFlow(null) }.collectAsState()
     val detail by g.settings.flow(S.waveDetail).collectAsState(g.settings[S.waveDetail])
@@ -176,11 +284,11 @@ fun NowPlaying(
         }
     }
     val wide = LocalConfiguration.current.screenWidthDp >= 600
-    val bg = when (bgMode) {
-        PlayerBackground.PLAIN -> Brush.verticalGradient(listOf(c.bg, c.bg))
-        else -> Brush.verticalGradient(0f to backdrop, 0.36f to mixColor(backdrop, c.bg, 0.5f), 0.62f to c.bg)
-    }
-    Box(Modifier.fillMaxSize().background(bg)) {
+    val bg = c.bg
+    Box(Modifier.fillMaxSize().drawBehind {
+        if (bgMode == PlayerBackground.PLAIN) drawRect(bg)
+        else backdrop.value.let { b -> drawRect(Brush.verticalGradient(0f to b, 0.36f to mixColor(b, bg, 0.5f), 0.62f to bg)) }
+    }) {
         if (bgMode == PlayerBackground.BLUR && t != null && android.os.Build.VERSION.SDK_INT >= 31) {
             ArtImage(ArtKey.Track(t.id), t.album, Modifier.fillMaxSize().blurCompat(), large = false, radius = 0.dp)
             Box(Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.72f)))
@@ -197,25 +305,36 @@ fun NowPlaying(
                 castButton()
                 IconBtn(TfIcons.More, "More", onClick = onMore)
             }
+            val swipe = rememberTrackSwipe(t?.id)
+            val dir = remember(t?.id) { ui.direction() }
+            val haptic = LocalHapticFeedback.current
+            val hapticsOn = LocalHaptics.current
             val artwork: @Composable (Modifier) -> Unit = { m ->
-                Box(m.shadow(20.dp, RoundedCornerShape(22.dp), ambientColor = accent.copy(alpha = 0.22f), spotColor = accent.copy(alpha = 0.35f))
-                    .pointerInput(Unit) {
-                        var d = 0f
-                        detectHorizontalDragGestures(onDragEnd = { if (abs(d) > 120) { if (d < 0) ui.next() else ui.previous() }; d = 0f },
-                            onHorizontalDrag = { ch, a -> ch.consume(); d += a })
-                    }) {
-                    AnimatedContent(t?.id, transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) }, label = "art") { id ->
-                        if (id != null) ArtImage(ArtKey.Track(id), t?.album?.ifBlank { t.displayTitle } ?: "", Modifier.fillMaxSize(), large = true, radius = 22.dp)
-                        else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)).background(c.surface2))
+                // swipe the artwork: it follows the finger, then slides the way it was swiped (or springs back)
+                Box(m.trackSwipe(swipe, ui, t?.id) { if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }) {
+                    AnimatedContent(t, contentKey = { it?.id }, transitionSpec = { slideTransition(dir, 1.15f, fade = false) }, label = "art") { track ->
+                        val fade = fadeCheaply()
+                        Box(Modifier.fillMaxSize()
+                            .graphicsLayer {
+                                val o = swipe.offset(track?.id, t?.id)
+                                translationX = o
+                                rotationZ = o / size.width * 5f
+                                alpha = fade.value
+                                compositingStrategy = CompositingStrategy.ModulateAlpha
+                            }
+                            .shadow(20.dp, RoundedCornerShape(22.dp), ambientColor = accent.copy(alpha = 0.22f), spotColor = accent.copy(alpha = 0.35f))) {
+                            if (track != null) ArtImage(ArtKey.Track(track.id), track.album.ifBlank { track.displayTitle }, Modifier.fillMaxSize(), large = true, radius = 22.dp)
+                            else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)).background(c.surface2))
+                        }
                     }
                 }
             }
             val controls: @Composable ColumnScope.() -> Unit = {
-                // title
-                AnimatedContent(t?.id, transitionSpec = { (fadeIn(tween(180)) + slideInVertically { it / 6 }) togetherWith fadeOut(tween(120)) }, label = "title") { _ ->
-                    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                        T(t?.displayTitle ?: "Nothing playing", Tf.type.display)
-                        T(listOf(t?.displayArtist, t?.album).filter { !it.isNullOrBlank() }.joinToString(" · "), Tf.type.body, c.textSecondary)
+                // title: slides with the artwork, a third as far
+                AnimatedContent(t, contentKey = { it?.id }, transitionSpec = { slideTransition(dir, 0.35f) }, label = "title") { track ->
+                    Column(Modifier.fillMaxWidth().padding(top = 14.dp).graphicsLayer { translationX = swipe.offset(track?.id, t?.id) * 0.35f }) {
+                        T(track?.displayTitle ?: "Nothing playing", Tf.type.display)
+                        T(listOf(track?.displayArtist, track?.album).filter { !it.isNullOrBlank() }.joinToString(" · "), Tf.type.body, c.textSecondary)
                     }
                 }
                 // pills

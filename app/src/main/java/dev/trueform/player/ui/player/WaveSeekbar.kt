@@ -12,9 +12,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -86,13 +87,25 @@ fun WaveSeekbar(
     val haptic = LocalHapticFeedback.current
     val hapticsOn = LocalHaptics.current
     val measurer = rememberTextMeasurer()
-    val frame by produceState(0L, playing) { if (playing) while (true) withFrameMillis { value = it } }
+    val widthPx = remember { IntArray(1) }
+    // Redraw when the playhead has moved about half a pixel, not every frame: a 3-minute track across a phone needs
+    // about ten redraws a second, and the screen can stay idle in between.
+    val tick by produceState(0L, playing, durationMs) {
+        if (playing) while (true) { delay((durationMs / widthPx[0].coerceAtLeast(1) / 2).coerceIn(16L, 500L)); value++ }
+    }
     var dragX by remember { mutableStateOf<Float?>(null) }
     var lastLiveSeek by remember { mutableStateOf(0L) }
     val dur by rememberUpdatedState(durationMs)
     val seek by rememberUpdatedState(onSeek)
-    val palette = Palette(c.waveLow, c.waveMid, c.waveHigh, accent, c.text.copy(alpha = if (c.isDark) 0.20f else 0.17f),
-        colorMode == WaveColor.ACCENT)
+    val now by rememberUpdatedState(position)
+    val accentNow by rememberUpdatedState(accent)
+    // The bitmaps depend on these only (on the accent only when it colours the waveform), so a recomposition, or the
+    // accent changing with the artwork, does not draw them again.
+    val accentOnly = colorMode == WaveColor.ACCENT
+    val restColor = c.text.copy(alpha = if (c.isDark) 0.20f else 0.17f)
+    val palette = remember(c.waveLow, c.waveMid, c.waveHigh, if (accentOnly) accent else Color.Unspecified, restColor, accentOnly) {
+        Palette(c.waveLow, c.waveMid, c.waveHigh, accent, restColor, accentOnly)
+    }
     val text = c.text
 
     val gestures = if (compact) Modifier else Modifier
@@ -130,18 +143,22 @@ fun WaveSeekbar(
                 stateDescription = "${spoken(pos)} of ${spoken(durationMs)}"
                 setProgress { v -> seek(v.toLong()); true }
             }
+            .graphicsLayer()   // its own layer: the playhead's redraws do not redraw the screen around it
             .drawWithCache {
                 val w = size.width.toInt().coerceAtLeast(1)
                 val h = size.height.toInt().coerceAtLeast(1)
+                widthPx[0] = w
                 val bars = shape == WaveShape.BARS && !compact
                 val played = data?.let { render(it, w, h, density, played = true, bars, compact, detail, palette) }
                 val rest = data?.let { render(it, w, h, density, played = false, bars, compact, detail, palette) }
                 val cy = if (compact) size.height else size.height / 2
                 val half = if (compact) size.height else size.height / 2 - 1.dp.toPx()
                 onDrawBehind {
-                    @Suppress("UNUSED_EXPRESSION") frame   // redraw every frame while playing
-                    val p = position()
-                    val x = dragX ?: if (durationMs > 0) (p.toFloat() / durationMs * size.width) else 0f
+                    @Suppress("UNUSED_EXPRESSION") tick   // redraw as the playhead moves
+                    val p = now()
+                    val d = dur
+                    val accent = accentNow
+                    val x = dragX ?: if (d > 0) (p.toFloat() / d * size.width) else 0f
                     if (played != null && rest != null) {
                         clipRect(right = x) { drawImage(played) }
                         clipRect(left = x) { drawImage(rest) }
@@ -159,7 +176,7 @@ fun WaveSeekbar(
                         dragX?.let { dx ->
                             drawCircle(accent.copy(alpha = 0.35f), 12.dp.toPx(), Offset(dx, cy))
                             drawCircle(text, 6.dp.toPx(), Offset(dx, cy))
-                            val target = (dx / size.width * durationMs).toLong()
+                            val target = (dx / size.width * d).toLong()
                             val delta = target - p
                             val label = formatDuration(target) + "  ·  " + (if (delta >= 0) "+" else "−") + formatDuration(abs(delta))
                             val layout = measurer.measure(label, TextStyle(fontFamily = InterFamily, fontSize = 12.sp, color = Color.White, fontFeatureSettings = "tnum"))
