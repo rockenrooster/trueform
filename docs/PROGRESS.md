@@ -288,3 +288,10 @@ Soaks: the owner capped scripted soaks at 15 minutes (an 8-hour run was stopped 
 every surface of the dark, black and light themes.
 15-minute soak (Moto, debug build, native EQ on, muted, repeat all): 15 one-minute samples, playing in every one,
 4 tracks, 0 underruns, one process, the position never stalled (`captures/soak-moto-20261120-1624.jsonl`).
+Release build 13 (R8, native EQ, "Bass boost", screen off, 90 s after a minute of warm-up): **6.1 % of one core** on
+the Moto (release before the native cascade and the limiter shortcut: 7.6 %). Under the 3 % budget only without EQ.
+
+Shared-phone slip (2026-11-20 16:46): during that last measurement another session's app (`dev.glowtide.game.dev`)
+was in front on the Moto; the script printed the foreground but did not stop, launched Trueform, pressed Home and
+turned the screen off for about three minutes. No lock was held by the other session. Scripts that send input must
+stop when the foreground is neither the launcher nor Trueform (`Test-TfDeviceFree`), not only print it.
