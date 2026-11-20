@@ -265,8 +265,12 @@ was simulated on the Moto with debug commands that rotate and rescale only this 
 
 Power (release build, Moto, screen off, FLAC 16/44.1 with the 10-band EQ, CPU ticks from `/proc/<pid>/stat` over
 120 s): **7.6 % of one core** before; most of it on ExoPlayer's playback thread (EQ and the 10 ms work loop),
-decoding itself is small (loader thread). ExoPlayer's dynamic scheduling is now on (the thread sleeps until the
-audio output needs data); result below.
+decoding itself is small (loader thread). ExoPlayer's dynamic scheduling (the thread sleeps until the audio output
+needs data): no measurable change (7.9 %). Debug build, warmed up, 60 s each: EQ + limiter 9.7 %, EQ off 5.0 %, both
+off 2.8 %: the limiter's per-sample bookkeeping cost about 2 points even when it never acts. It now skips that work
+while nothing approaches the ceiling (bit-identical, JVM test): EQ + limiter 7.9 %, EQ off 4.1 %, both off 3.0 %.
+**The 3 % budget is still missed with the EQ on**: the 10-band cascade in Kotlin costs about 4 points on the Moto.
+The fix would be the filter cascade in C++ next to the decoder (NEON, double precision); not done in this session.
 
 Bluetooth: off on the Moto (switching it on is a phone-wide setting); not tested. Android Auto: installed on the
 Moto, but testing needs its developer settings changed (the owner's call); the browse tree is covered by

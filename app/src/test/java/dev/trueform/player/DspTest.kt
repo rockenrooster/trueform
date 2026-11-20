@@ -242,4 +242,27 @@ class DspTest {
         mono.apply(m3, 2)
         assertEquals(0.5f, m3[0], 1e-6f); assertEquals(0.5f, m3[1], 1e-6f); assertEquals(0f, m3[2], 1e-6f)
     }
+
+    @Test
+    fun limiterShortcutIsBitIdentical() {   // quiet, a loud burst with overs, the release back to 1, quiet again
+        val fs = 44100
+        val n = fs * 3
+        val sig = DoubleArray(n * 2) { i ->
+            val f = i / 2
+            val amp = if (f in fs..(fs + fs / 4)) 1.6 else 0.5
+            amp * kotlin.math.sin(2 * Math.PI * 440.0 * f / fs + (i % 2) * 0.3)
+        }
+        val a = Limiter(fs, 0f)
+        val b = Limiter(fs, 0f).apply { fastPath = false }
+        val outA = sig.copyOf(); val outB = sig.copyOf()
+        var pos = 0
+        val chunk = 1024
+        while (pos < n) {
+            val frames = minOf(chunk, n - pos)
+            val ca = outA.copyOfRange(pos * 2, (pos + frames) * 2); a.process(ca, frames); ca.copyInto(outA, pos * 2)
+            val cb = outB.copyOfRange(pos * 2, (pos + frames) * 2); b.process(cb, frames); cb.copyInto(outB, pos * 2)
+            pos += frames
+        }
+        for (i in outA.indices) if (outA[i] != outB[i]) fail("sample $i differs: ${outA[i]} vs ${outB[i]}")
+    }
 }

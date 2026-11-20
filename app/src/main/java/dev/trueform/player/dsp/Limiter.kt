@@ -48,6 +48,10 @@ class Limiter(fs: Int, ceilingDb: Float) {
 
     /** Processes [frames] interleaved stereo frames of [buf] in place (doubles). */
     fun process(buf: DoubleArray, frames: Int) {
+        if (fastPath && mBelowOne == 0 && gain == 1.0 && peak(buf, frames) <= ceiling) {
+            delayOnly(buf, frames)
+            return
+        }
         for (i in 0 until frames) {
             val l = buf[i * 2]
             val r = buf[i * 2 + 1]
@@ -89,6 +93,35 @@ class Limiter(fs: Int, ceilingDb: Float) {
             t++
         }
         reductionDb = if (minGainSinceRead < 1.0) (20 * log10(minGainSinceRead)).toFloat() else 0f
+    }
+
+    /** Tests turn the shortcut off to compare it with the full loop. */
+    internal var fastPath = true
+
+    private fun peak(buf: DoubleArray, frames: Int): Double {
+        var p = 0.0
+        for (i in 0 until frames * 2) { val a = abs(buf[i]); if (a > p) p = a }
+        return p
+    }
+
+    /**
+     * The common case, without the per-sample bookkeeping (measured: about 2 % of a core on the Moto): nothing in the
+     * window needs a reduction and the gain is exactly 1, so every needed gain is 1, the sliding minimum and its mean
+     * are 1, the gain stays 1, and the output is the input delayed — what the full loop computes, bit for bit.
+     */
+    private fun delayOnly(buf: DoubleArray, frames: Int) {
+        var pos = linePos
+        for (i in 0 until frames) {
+            val j = pos * 2
+            val dl = line[j]; val dr = line[j + 1]
+            line[j] = buf[i * 2]; line[j + 1] = buf[i * 2 + 1]
+            buf[i * 2] = dl; buf[i * 2 + 1] = dr
+            pos = if (pos + 1 == delay) 0 else pos + 1
+        }
+        linePos = pos
+        dqLen = 0                                   // no window entry below 1: no candidates for the minimum
+        mPos = ((mPos + frames.toLong()) % window).toInt()   // the mean's ring holds only 1.0 (mBelowOne == 0)
+        t += frames
     }
 
     /** Resets the peak hold of [reductionDb]; the UI calls this after showing a value. */
