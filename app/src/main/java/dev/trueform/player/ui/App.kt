@@ -150,6 +150,17 @@ private fun Main(g: AppGraph) {
     val snackbar = remember { SnackbarHostState() }
     val holder = rememberSaveableStateHolder()
     LaunchedEffect(Unit) { g.queue.messages.collect { snackbar.showSnackbar(it) } }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {   // a crash last time: offer the report once (docs/plan/11-testing-hardening.md hardening 1)
+        val f = dev.trueform.player.system.Logs.crashFile(context)
+        val at = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { if (f.exists()) f.lastModified() else 0L }
+        if (at > g.settings.privateLong("crash_seen")) {
+            g.settings.putPrivateLong("crash_seen", at)
+            sheet = SheetKind.Message("Trueform closed unexpectedly",
+                "A report with the error and what was playing is ready. Nothing leaves the phone unless you share it.",
+                "Share report") { dev.trueform.player.system.Logs.runAction(g, S.exportLogs.key, context) }
+        }
+    }
 
     fun openPlayer() = scope.launch { expand.animateTo(1f, spring(0.85f, 380f)) }
     fun closePlayer() = scope.launch { expand.animateTo(0f, spring(0.85f, 380f)) }

@@ -40,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
@@ -80,8 +81,15 @@ class AppGraph(val app: Application) {
             android.os.SystemClock::elapsedRealtime, io)
     }
 
+    // Start-up disk work off the main thread, so creating the player finds it done (StrictMode measured ~0.5 s of
+    // main-thread reads on the Moto: the Play services check, the database, the saved queue).
+    private val castAvailable = io.async { CastManager.available(app) }
+    init {
+        io.launch { db.writableDatabase; resume.load() }
+    }
+
     /** Chromecast, where Google Play services exists (docs/plan/07-chromecast.md T1); null elsewhere, nothing touched. */
-    val cast: CastManager? by lazy { if (CastManager.available(app)) CastManager(this) else null }
+    val cast: CastManager? by lazy { if (kotlinx.coroutines.runBlocking { castAvailable.await() }) CastManager(this) else null }
 
     /** The player the queue drives: the local ExoPlayer, inside Media3's CastPlayer where Cast exists. */
     val corePlayer: Player by lazy {
