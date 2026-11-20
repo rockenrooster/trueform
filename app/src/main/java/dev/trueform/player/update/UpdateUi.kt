@@ -46,8 +46,7 @@ object UpdateUi {
         val g = LocalGraph.current
         val s by g.updater.state.collectAsState()
         LaunchedEffect(Unit) { if (g.settings[S.checkUpdates]) g.updater.check() }
-        val r = releaseOf(s) ?: return
-        if (s is UpdateState.Failed) return
+        val r = releaseOf(s) ?: return   // a failed attempt keeps the pill: the sheet says why and offers "Try again"
         PillButton("Update · build ${r.build}", null, primary = false) { actions.sheet(SheetKind.Update) }
     }
 
