@@ -326,8 +326,9 @@ Owner reports and what changed:
   finger, then slide out the way they were swiped while the next track comes in from the other side; a short or
   impossible swipe springs back (with resistance where there is no track). Previous/next buttons slide the same way.
 - **Mini player**: Previous button.
-- **Folder browser**: swipe in from the left edge to go up a folder (the folder follows the finger). Plain left and
-  right swipes were already taken on song rows (add to queue, play next), so the gesture starts at the edge.
+- **Folder browser**: a swipe to the right goes up a folder (the folder follows the finger), starting anywhere in the
+  list, as in Poweramp: the owner's choice, in place of the rows' swipe-right "play next" there (still in the
+  long-press menu; other lists keep both row swipes). A first version used only the left edge.
 - **Artwork that never loaded after swiping to a song** (reported through another session): the player and the
   notification (through `ArtProvider`) asked for the same large picture at the same moment and wrote the same
   temporary file; one failed or the file was damaged, and the player kept the placeholder. Each writer now has its
@@ -420,6 +421,10 @@ Owner reports and what changed:
   - ExoPlayer's playback loop wakes about 8 times a second (dynamic scheduling works); nothing to gain there.
   - **Result: Moto, screen off, 10-band EQ, compiled: 2.39 % of one core — the 3 % budget is met**, on the slower
     phone (6.1 % in release build 13). The 12R is faster still (2.88 % before this last step, screen on).
+- Release build 31 installed on the 12R as `dev.trueform.player` at the owner's request (from the GitHub release,
+  SHA-256 checked), next to the test app.
+- List drawing: song rows paint their own background only while swiped; the mini player's faint waveform is drawn
+  at its opacity without an offscreen layer (not measured yet: both phones busy with the owner and another session).
 - The 15-minute cast soak and the simulated network drop (`cast_blackout`, new) were postponed: at 22:46 the cast
   devices on the network were bedroom and bathroom speakers and TVs (a session can chime or switch a TV on, even at
   volume 0). To run in the daytime.
