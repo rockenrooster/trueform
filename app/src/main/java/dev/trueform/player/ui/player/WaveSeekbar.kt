@@ -232,6 +232,8 @@ private fun CentredWave(
     val path = remember { Path() }
 
     fun shown(): Float = scrub ?: now().toFloat()
+    /** Scrubbing stops a second before the end: a flick to the end would otherwise skip to the next track. */
+    fun last(): Long = if (dur > 2000) dur - 1000 else dur
     fun liveSeek(ms: Float) {
         val t = SystemClock.uptimeMillis()
         if (live && t - lastLiveSeek[0] > 100) { lastLiveSeek[0] = t; seek(ms.toLong()) }
@@ -245,7 +247,7 @@ private fun CentredWave(
                 val from = shown()
                 glide[0]?.cancel()
                 scrub = null
-                seek((from + (o.x - size.width / 2f) * msPerPx[0]).toLong().coerceIn(0, dur))
+                seek((from + (o.x - size.width / 2f) * msPerPx[0]).toLong().coerceIn(0, last()))
             }
         }
         .pointerInput(Unit) {
@@ -262,8 +264,8 @@ private fun CentredWave(
                     val v = -velocity.calculateVelocity().x * msPerPx[0]   // track ms per second
                     glide[0] = scope.launch {
                         val anim = Animatable(shown())
-                        anim.updateBounds(0f, dur.toFloat())
-                        if (abs(v) > 400f * msPerPx[0]) anim.animateDecay(v, exponentialDecay(frictionMultiplier = 3f)) { scrub = value; liveSeek(value) }
+                        anim.updateBounds(0f, last().toFloat())
+                        if (abs(v) > 400f * msPerPx[0]) anim.animateDecay(v, exponentialDecay(frictionMultiplier = 5f)) { scrub = value; liveSeek(value) }
                         seek(anim.value.toLong())
                         scrub = null
                         tickHaptic()
@@ -273,7 +275,7 @@ private fun CentredWave(
                 onHorizontalDrag = { change, amount ->
                     change.consume()
                     velocity.addPosition(change.uptimeMillis, change.position)
-                    val s = (shown() - amount * msPerPx[0]).coerceIn(0f, dur.toFloat())
+                    val s = (shown() - amount * msPerPx[0]).coerceIn(0f, last().toFloat())
                     scrub = s
                     liveSeek(s)
                 },
