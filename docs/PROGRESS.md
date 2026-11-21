@@ -335,3 +335,15 @@ Owner reports and what changed:
 - **Seek bar centred and zoomed, with momentum** ("like Poweramp"): see 05-waveform-seekbar.md. Four waveform
   columns a second (blob version 2: stored waveforms are analysed again when their track plays). `WaveformTest`
   (JVM): blob round trip with any column count, column bounds, zoomed bar pooling with partial data.
+- The player's accent no longer flashes the theme colour between tracks (the previous artwork's colours stay until
+  the new ones are ready).
+
+12R, locked with the screen off (the owner's phone, idle; their queue, position and EQ file restored afterwards):
+
+- Waveform analysis at background priority, screen off: two 3-minute 48 kHz FLACs in 3.1 s and 4.8 s. The budget
+  (4-minute FLAC 16/44.1 in 1.5 s) is for the app in use; to measure with the screen on.
+- The screen-off CPU measurement could not run this way: Android refuses audio focus ("AudioHardening focus request
+  ignored") and the foreground service ("Background started FGS: Disallowed") to an app that starts playback from the
+  background, so the debug `play` command did nothing on the locked phone. Not a defect for users (playback starts
+  from the app, the notification or a media button); the measurement has to start playback with the app in front,
+  then turn the screen off.

@@ -101,7 +101,8 @@ fun rememberArtColors(trackId: Long?): ArtColors? {
     val g = LocalGraph.current
     val c = Tf.colors
     val enabled by g.settings.flow(S.artworkColors).collectAsState(g.settings[S.artworkColors])
-    var colors by remember(trackId, enabled) { mutableStateOf<ArtColors?>(null) }
+    // kept across a track change until the new artwork's colours are ready (no flash of the theme accent in between)
+    var colors by remember(enabled) { mutableStateOf<ArtColors?>(null) }
     LaunchedEffect(trackId, enabled, c.isDark) {
         if (!enabled || trackId == null) { colors = null; return@LaunchedEffect }
         val bmp = g.artwork.track(trackId, 256) ?: run { colors = null; return@LaunchedEffect }
