@@ -145,7 +145,10 @@ the player splits into artwork left, controls right. Build the phone layout in M
 - Tap a song: play (scope from the setting "Tapping a song plays", default: this folder and its subfolders,
   starting at the song). Tap a folder: enter it. Long-press either: bottom sheet (Play, Shuffle, Play next, Add to
   queue, Add to playlist; song: Go to album, Info; folder: Exclude from library).
-- Swipe a song right: play next. Swipe left: add to queue. (Setting to turn swipes off.)
+- Swipe a song right: play next. Swipe left: add to queue. (Setting to turn swipes off.) In the folder browser a
+  swipe right anywhere in the list goes up one folder instead, as in Poweramp (the owner's choice, 2026-11-20): the
+  page follows the finger and goes up past a third of the width or on a fling; play next stays in the long-press
+  sheet.
 - Multi-select by long-press then taps; a contextual bar offers the batch actions.
 - Fast scroller with a letter bubble on lists longer than three screens.
 - Folder transitions: shared-axis horizontal, 220 ms.
