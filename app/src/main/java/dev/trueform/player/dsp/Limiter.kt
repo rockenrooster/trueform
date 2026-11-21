@@ -46,9 +46,9 @@ class Limiter(fs: Int, ceilingDb: Float) {
         gain = 1.0; t = 0
     }
 
-    /** Processes [frames] interleaved stereo frames of [buf] in place (doubles). */
-    fun process(buf: DoubleArray, frames: Int) {
-        if (fastPath && mBelowOne == 0 && gain == 1.0 && peak(buf, frames) <= ceiling) {
+    /** Processes [frames] interleaved stereo frames of [buf] in place (doubles); [knownPeak]: their largest magnitude, if known. */
+    fun process(buf: DoubleArray, frames: Int, knownPeak: Double = -1.0) {
+        if (fastPath && mBelowOne == 0 && gain == 1.0 && (if (knownPeak >= 0) knownPeak else peak(buf, frames)) <= ceiling) {
             delayOnly(buf, frames)
             return
         }
@@ -110,15 +110,19 @@ class Limiter(fs: Int, ceilingDb: Float) {
      * are 1, the gain stays 1, and the output is the input delayed — what the full loop computes, bit for bit.
      */
     private fun delayOnly(buf: DoubleArray, frames: Int) {
-        var pos = linePos
-        for (i in 0 until frames) {
-            val j = pos * 2
-            val dl = line[j]; val dr = line[j + 1]
-            line[j] = buf[i * 2]; line[j + 1] = buf[i * 2 + 1]
-            buf[i * 2] = dl; buf[i * 2 + 1] = dr
-            pos = if (pos + 1 == delay) 0 else pos + 1
+        if (DspChain.nativeCascade) {
+            linePos = dev.trueform.player.audio.Native.delayLine(buf, frames, line, linePos, delay)
+        } else {
+            var pos = linePos
+            for (i in 0 until frames) {
+                val j = pos * 2
+                val dl = line[j]; val dr = line[j + 1]
+                line[j] = buf[i * 2]; line[j + 1] = buf[i * 2 + 1]
+                buf[i * 2] = dl; buf[i * 2 + 1] = dr
+                pos = if (pos + 1 == delay) 0 else pos + 1
+            }
+            linePos = pos
         }
-        linePos = pos
         dqLen = 0                                   // no window entry below 1: no candidates for the minimum
         mPos = ((mPos + frames.toLong()) % window).toInt()   // the mean's ring holds only 1.0 (mBelowOne == 0)
         t += frames

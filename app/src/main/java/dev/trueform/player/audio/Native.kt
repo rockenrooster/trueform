@@ -75,6 +75,19 @@ internal object Native {
     /** The EQ's biquad cascade in place over interleaved stereo (DspChain): coeffs b0 b1 b2 a1 a2, z z1l z2l z1r z2r. */
     external fun cascade(buf: DoubleArray, frames: Int, coeffs: DoubleArray, z: DoubleArray)
 
+    /**
+     * One DSP stage from floats in one pass (DspChain.apply without a crossfade): [buf] to doubles in [work], preamp
+     * (skipped at 1.0), the cascade, mono, balance (skipped at 1, 1). Returns the largest magnitude in [work].
+     */
+    external fun stageIn(buf: FloatArray, frames: Int, work: DoubleArray, preamp: Double, coeffs: DoubleArray, z: DoubleArray,
+                         mono: Boolean, gl: Double, gr: Double): Double
+
+    /** [work] back to floats into [out]; the largest left and right magnitudes into [peaks] 0 and 1. */
+    external fun stageOut(work: DoubleArray, frames: Int, out: FloatArray, peaks: FloatArray)
+
+    /** The limiter's idle case: [work] through the delay line of [delay] frames from [pos]; returns the new position. */
+    external fun delayLine(work: DoubleArray, frames: Int, line: DoubleArray, pos: Int, delay: Int): Int
+
     /** False where the library cannot load (JVM unit tests): callers keep a Kotlin path. */
     val available: Boolean by lazy { runCatching { ffmpegVersion(); true }.getOrDefault(false) }
 }

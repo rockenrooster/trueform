@@ -203,48 +203,123 @@ void close(JNIEnv*, jclass, jlong h) { delete reinterpret_cast<tf::Decoder*>(h);
 void setTrace(JNIEnv*, jclass, jboolean on) { tf::gTrace = on; }
 
 // The equalizer's biquad cascade (DspChain.Stage), in place over interleaved stereo doubles: transposed direct form II
-// as in the Kotlin loop it replaces; on arm64 left and right are the two lanes of one register. coeffs: b0 b1 b2 a1 a2
-// per filter; z: z1l z2l z1r z2r per filter. States that fall into the denormal range are flushed (long silences).
+// as in the Kotlin loop it replaces; on arm64 left and right are the two lanes of one register, with fused multiply-adds
+// (five operations a sample instead of nine: the phones' little cores are limited by how many they can issue; results
+// differ from the Kotlin loop by rounding only, about 1e-16 relative). coeffs: b0 b1 b2 a1 a2 per filter; z: z1l z2l
+// z1r z2r per filter. States that fall into the denormal range are flushed (long silences).
+void cascadeD(double* buf, jint frames, const double* k, double* z, jsize filters) {
+    for (jsize f = 0; f < filters; ++f) {
+        const double* c = k + f * 5;
+        double* s = z + f * 4;
+#if defined(__aarch64__)
+        const float64x2_t b0 = vdupq_n_f64(c[0]), b1 = vdupq_n_f64(c[1]), b2 = vdupq_n_f64(c[2]);
+        const float64x2_t na1 = vdupq_n_f64(-c[3]), na2 = vdupq_n_f64(-c[4]);
+        float64x2_t z1 = {s[0], s[2]};
+        float64x2_t z2 = {s[1], s[3]};
+        for (jint i = 0; i < frames; ++i) {
+            const float64x2_t x = vld1q_f64(buf + 2 * i);
+            const float64x2_t y = vfmaq_f64(z1, b0, x);              // b0 x + z1
+            z1 = vfmaq_f64(vfmaq_f64(z2, b1, x), na1, y);            // b1 x + z2 - a1 y
+            z2 = vfmaq_f64(vmulq_f64(b2, x), na2, y);                // b2 x - a2 y
+            vst1q_f64(buf + 2 * i, y);
+        }
+        double out[4] = {vgetq_lane_f64(z1, 0), vgetq_lane_f64(z2, 0), vgetq_lane_f64(z1, 1), vgetq_lane_f64(z2, 1)};
+#else
+        double z1l = s[0], z2l = s[1], z1r = s[2], z2r = s[3];
+        for (jint i = 0; i < frames; ++i) {
+            const double xl = buf[2 * i], xr = buf[2 * i + 1];
+            const double yl = c[0] * xl + z1l, yr = c[0] * xr + z1r;
+            z1l = c[1] * xl - c[3] * yl + z2l; z2l = c[2] * xl - c[4] * yl;
+            z1r = c[1] * xr - c[3] * yr + z2r; z2r = c[2] * xr - c[4] * yr;
+            buf[2 * i] = yl; buf[2 * i + 1] = yr;
+        }
+        double out[4] = {z1l, z2l, z1r, z2r};
+#endif
+        for (int j = 0; j < 4; ++j) s[j] = std::fabs(out[j]) < 1e-30 ? 0.0 : out[j];
+    }
+}
+
 void cascade(JNIEnv* env, jclass, jdoubleArray jbuf, jint frames, jdoubleArray jcoeffs, jdoubleArray jz) {
     const jsize filters = env->GetArrayLength(jcoeffs) / 5;
     if (frames <= 0 || filters <= 0 || env->GetArrayLength(jz) < filters * 4 || env->GetArrayLength(jbuf) < frames * 2) return;
     auto* buf = static_cast<double*>(env->GetPrimitiveArrayCritical(jbuf, nullptr));
     auto* k = static_cast<double*>(env->GetPrimitiveArrayCritical(jcoeffs, nullptr));
     auto* z = static_cast<double*>(env->GetPrimitiveArrayCritical(jz, nullptr));
-    if (buf && k && z) {
-        for (jsize f = 0; f < filters; ++f) {
-            const double* c = k + f * 5;
-            double* s = z + f * 4;
-#if defined(__aarch64__)
-            const float64x2_t b0 = vdupq_n_f64(c[0]), b1 = vdupq_n_f64(c[1]), b2 = vdupq_n_f64(c[2]);
-            const float64x2_t a1 = vdupq_n_f64(c[3]), a2 = vdupq_n_f64(c[4]);
-            float64x2_t z1 = {s[0], s[2]};
-            float64x2_t z2 = {s[1], s[3]};
-            for (jint i = 0; i < frames; ++i) {
-                const float64x2_t x = vld1q_f64(buf + 2 * i);
-                const float64x2_t y = vaddq_f64(vmulq_f64(b0, x), z1);
-                z1 = vaddq_f64(vsubq_f64(vmulq_f64(b1, x), vmulq_f64(a1, y)), z2);
-                z2 = vsubq_f64(vmulq_f64(b2, x), vmulq_f64(a2, y));
-                vst1q_f64(buf + 2 * i, y);
-            }
-            double out[4] = {vgetq_lane_f64(z1, 0), vgetq_lane_f64(z2, 0), vgetq_lane_f64(z1, 1), vgetq_lane_f64(z2, 1)};
-#else
-            double z1l = s[0], z2l = s[1], z1r = s[2], z2r = s[3];
-            for (jint i = 0; i < frames; ++i) {
-                const double xl = buf[2 * i], xr = buf[2 * i + 1];
-                const double yl = c[0] * xl + z1l, yr = c[0] * xr + z1r;
-                z1l = c[1] * xl - c[3] * yl + z2l; z2l = c[2] * xl - c[4] * yl;
-                z1r = c[1] * xr - c[3] * yr + z2r; z2r = c[2] * xr - c[4] * yr;
-                buf[2 * i] = yl; buf[2 * i + 1] = yr;
-            }
-            double out[4] = {z1l, z2l, z1r, z2r};
-#endif
-            for (int j = 0; j < 4; ++j) s[j] = std::fabs(out[j]) < 1e-30 ? 0.0 : out[j];
-        }
-    }
+    if (buf && k && z) cascadeD(buf, frames, k, z, filters);
     if (z) env->ReleasePrimitiveArrayCritical(jz, z, 0);
     if (k) env->ReleasePrimitiveArrayCritical(jcoeffs, k, JNI_ABORT);
     if (buf) env->ReleasePrimitiveArrayCritical(jbuf, buf, 0);
+}
+
+// One DSP stage in a single pass from the float buffer (DspChain.apply without a crossfade): float to double into
+// work, preamp (skipped at exactly 1), the cascade, mono, balance (skipped at 1, 1), as DspChain.Stage.run does in
+// Kotlin. Returns the largest magnitude in work (the limiter's "nothing to do" test).
+jdouble stageIn(JNIEnv* env, jclass, jfloatArray jin, jint frames, jdoubleArray jwork, jdouble preamp,
+                jdoubleArray jcoeffs, jdoubleArray jz, jboolean mono, jdouble gl, jdouble gr) {
+    const jint n = frames * 2;
+    const jsize filters = env->GetArrayLength(jcoeffs) / 5;
+    if (frames <= 0 || env->GetArrayLength(jin) < n || env->GetArrayLength(jwork) < n || env->GetArrayLength(jz) < filters * 4) return 0;
+    auto* in = static_cast<float*>(env->GetPrimitiveArrayCritical(jin, nullptr));
+    auto* w = static_cast<double*>(env->GetPrimitiveArrayCritical(jwork, nullptr));
+    auto* k = filters > 0 ? static_cast<double*>(env->GetPrimitiveArrayCritical(jcoeffs, nullptr)) : nullptr;
+    auto* z = filters > 0 ? static_cast<double*>(env->GetPrimitiveArrayCritical(jz, nullptr)) : nullptr;
+    double peak = 0;
+    if (in && w && (filters == 0 || (k && z))) {
+        for (jint i = 0; i < n; ++i) w[i] = static_cast<double>(in[i]);
+        if (preamp != 1.0) for (jint i = 0; i < n; ++i) w[i] *= preamp;
+        if (filters > 0) cascadeD(w, frames, k, z, filters);
+        if (mono) for (jint i = 0; i < n; i += 2) { const double m = (w[i] + w[i + 1]) * 0.5; w[i] = m; w[i + 1] = m; }
+        if (gl != 1.0 || gr != 1.0) for (jint i = 0; i < n; i += 2) { w[i] *= gl; w[i + 1] *= gr; }
+        for (jint i = 0; i < n; ++i) { const double a = std::fabs(w[i]); if (a > peak) peak = a; }
+    }
+    if (z) env->ReleasePrimitiveArrayCritical(jz, z, 0);
+    if (k) env->ReleasePrimitiveArrayCritical(jcoeffs, k, JNI_ABORT);
+    if (w) env->ReleasePrimitiveArrayCritical(jwork, w, 0);
+    if (in) env->ReleasePrimitiveArrayCritical(jin, in, JNI_ABORT);
+    return peak;
+}
+
+// The way back: work to float into out, with the largest left and right magnitudes into peaks[0..1] (the meters).
+void stageOut(JNIEnv* env, jclass, jdoubleArray jwork, jint frames, jfloatArray jout, jfloatArray jpeaks) {
+    const jint n = frames * 2;
+    if (frames <= 0 || env->GetArrayLength(jwork) < n || env->GetArrayLength(jout) < n || env->GetArrayLength(jpeaks) < 2) return;
+    auto* w = static_cast<double*>(env->GetPrimitiveArrayCritical(jwork, nullptr));
+    auto* out = static_cast<float*>(env->GetPrimitiveArrayCritical(jout, nullptr));
+    auto* pk = static_cast<float*>(env->GetPrimitiveArrayCritical(jpeaks, nullptr));
+    if (w && out && pk) {
+        float pl = 0, pr = 0;
+        for (jint i = 0; i < n; i += 2) {
+            const float l = static_cast<float>(w[i]), r = static_cast<float>(w[i + 1]);
+            out[i] = l; out[i + 1] = r;
+            const float al = std::fabs(l), ar = std::fabs(r);
+            if (al > pl) pl = al;
+            if (ar > pr) pr = ar;
+        }
+        pk[0] = pl; pk[1] = pr;
+    }
+    if (pk) env->ReleasePrimitiveArrayCritical(jpeaks, pk, 0);
+    if (out) env->ReleasePrimitiveArrayCritical(jout, out, 0);
+    if (w) env->ReleasePrimitiveArrayCritical(jwork, w, JNI_ABORT);
+}
+
+// The limiter's idle case (Limiter.delayOnly): work goes through the delay line of [delay] stereo frames starting at
+// [pos]; returns the new position.
+jint delayLine(JNIEnv* env, jclass, jdoubleArray jwork, jint frames, jdoubleArray jline, jint pos, jint delay) {
+    if (frames <= 0 || delay <= 0 || env->GetArrayLength(jwork) < frames * 2 || env->GetArrayLength(jline) < delay * 2) return pos;
+    auto* w = static_cast<double*>(env->GetPrimitiveArrayCritical(jwork, nullptr));
+    auto* line = static_cast<double*>(env->GetPrimitiveArrayCritical(jline, nullptr));
+    if (w && line) {
+        for (jint i = 0; i < frames; ++i) {
+            const jint j = pos * 2;
+            const double dl = line[j], dr = line[j + 1];
+            line[j] = w[i * 2]; line[j + 1] = w[i * 2 + 1];
+            w[i * 2] = dl; w[i * 2 + 1] = dr;
+            pos = pos + 1 == delay ? 0 : pos + 1;
+        }
+    }
+    if (line) env->ReleasePrimitiveArrayCritical(jline, line, 0);
+    if (w) env->ReleasePrimitiveArrayCritical(jwork, w, 0);
+    return pos;
 }
 
 const JNINativeMethod kMethods[] = {
@@ -260,6 +335,9 @@ const JNINativeMethod kMethods[] = {
     {"close", "(J)V", reinterpret_cast<void*>(close)},
     {"setTrace", "(Z)V", reinterpret_cast<void*>(setTrace)},
     {"cascade", "([DI[D[D)V", reinterpret_cast<void*>(cascade)},
+    {"stageIn", "([FI[DD[D[DZDD)D", reinterpret_cast<void*>(stageIn)},
+    {"stageOut", "([DI[F[F)V", reinterpret_cast<void*>(stageOut)},
+    {"delayLine", "([DI[DII)I", reinterpret_cast<void*>(delayLine)},
 };
 
 }  // namespace

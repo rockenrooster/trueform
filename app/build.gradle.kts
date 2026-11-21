@@ -61,6 +61,7 @@ android {
             initWith(getByName("release"))
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-staging"
+            proguardFiles("proguard-staging.pro")
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
         }

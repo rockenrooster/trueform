@@ -397,8 +397,25 @@ Owner reports and what changed:
   uploads. The GPU runs at a low clock until a fling starts. The 95th-percentile budget (8.3 ms, measured as gfxinfo
   frame time including the GPU) stays missed; what remains is outside the app's main thread.
 - UI timers (waveform ticks, time labels, limiter meter, position anchor) now park while the app is not visible, so
-  they no longer wake the main thread with the screen off (not yet measured: both phones were taken by another
-  session).
+  they no longer wake the main thread with the screen off.
+- **CPU, where it goes** (per thread from `/proc/<pid>/task`, staging build, 10-band EQ): 12R with the app in the
+  background (screen on, the owner keeps it awake): 3.78 % in all, 3.08 of it ExoPlayer's playback thread, 0.31 the
+  loader (FFmpeg decoding), 0.21 the main thread; EQ off 2.79 %. A `simpleperf` profile of the playback thread on the
+  Moto (the 12R refuses perf events): 62 % in our DSP — 34 % the native filter cascade, 16 % the Kotlin loops around
+  it (float/double conversion, preamp, peaks, the limiter's delay line) — and about 25 % ExoPlayer's own loop, much
+  of it still interpreted right after an install. Changes:
+  - The DSP's common case is native end to end: one pass from the float buffer (conversion, preamp, filters, mono,
+    balance; it returns the peak the limiter needs), the limiter's idle delay line, one pass back with the meters'
+    peaks. The filters use fused multiply-adds (five operations a sample instead of nine; the little cores are limited
+    by issue rate). No longer bit-identical to the Kotlin loop: `DspNativeTest` on the Moto, max difference 1.9e-9 at
+    44.1 kHz and 1.5e-8 at 192 kHz (below the float output's own step); one 100 ms buffer of the whole chain, 10 bands
+    at 44.1 kHz: 0.29 ms native, 0.79 ms Kotlin.
+  - Results: 12R, background, screen on, EQ on: 3.35 % (playback thread 2.61) just after the install; **2.88 %**
+    (playback 2.22) once Android has compiled the app (`cmd package compile -m speed`, what background optimisation
+    does on users' phones within a day). Moto, **screen off**, EQ on, compiled: **3.13 %** (release build 13 was 6.1 %);
+    EQ off 1.80 %. The 3 % budget is met on the 12R as measured (screen on, app in the background; the screen-off run
+    cannot be done there without locking the owner's phone) and missed by a hair on the slower Moto with the screen
+    off.
 - The 15-minute cast soak and the simulated network drop (`cast_blackout`, new) were postponed: at 22:46 the cast
   devices on the network were bedroom and bathroom speakers and TVs (a session can chime or switch a TV on, even at
   volume 0). To run in the daytime.

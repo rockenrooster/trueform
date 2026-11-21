@@ -78,6 +78,17 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
 
         val n = frames * 2
         if (work.size < n) work = DoubleArray(n)
+        if (fading == null && nativeCascade) {
+            // The common case in native code: one pass in (conversion, preamp, filters, mono, balance), the limiter,
+            // one pass out. Measured on the Moto, these Kotlin loops were about a sixth of the playback thread's time.
+            val pre = if (st.preampDb != 0.0) st.preamp else 1.0
+            val peak = dev.trueform.player.audio.Native.stageIn(buf, frames, work, pre, st.flat, st.z, st.mono, st.gl, st.gr)
+            lim?.process(work, frames, peak)
+            dev.trueform.player.audio.Native.stageOut(work, frames, buf, outPeaks)
+            if (outPeaks[0] > peakL) peakL = outPeaks[0]
+            if (outPeaks[1] > peakR) peakR = outPeaks[1]
+            return true
+        }
         for (i in 0 until n) work[i] = buf[i].toDouble()
         if (fading != null) {
             val fadeFrames = min(FADE - fadeDone, frames)
@@ -115,6 +126,7 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
     /** Output peaks since the last [takePeaks] (the EQ screen's meters); only while the chain processes. */
     @Volatile private var peakL = 0f
     @Volatile private var peakR = 0f
+    private val outPeaks = FloatArray(2)
     fun takePeaks(): Pair<Float, Float> = (peakL to peakR).also { peakL = 0f; peakR = 0f }
 
     private fun switchTo(p: DspParams) {
@@ -141,9 +153,9 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
         val mono: Boolean,
     ) {
         val z = DoubleArray(coeffs.size * 4)
-        private val preamp = 10.0.pow(preampDb / 20)
+        val preamp = 10.0.pow(preampDb / 20)
         /** b0 b1 b2 a1 a2 per filter, for the native cascade (several times cheaper than the Kotlin loop on a phone). */
-        private val flat = DoubleArray(coeffs.size * 5).also { a ->
+        val flat = DoubleArray(coeffs.size * 5).also { a ->
             coeffs.forEachIndexed { f, k -> a[f * 5] = k.b0; a[f * 5 + 1] = k.b1; a[f * 5 + 2] = k.b2; a[f * 5 + 3] = k.a1; a[f * 5 + 4] = k.a2 }
         }
         val neutral = coeffs.isEmpty() && preampDb == 0.0 && gl == 1.0 && gr == 1.0 && !mono

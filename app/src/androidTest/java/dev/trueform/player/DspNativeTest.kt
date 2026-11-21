@@ -14,8 +14,9 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * The native filter cascade against the Kotlin one (docs/plan/06-dsp-equalizer.md T6, 11-testing-hardening.md
- * budgets): same output within 1e-9 (float output: far below one LSB of 24-bit), and the time for one 100 ms buffer.
+ * The native DSP path (conversion, filters with fused multiply-adds, mono/balance, limiter delay) against the Kotlin
+ * one (docs/plan/06-dsp-equalizer.md T6, 11-testing-hardening.md budgets): the same output up to rounding (measured
+ * 1.9e-9 at 44.1 kHz, 1.5e-8 at 192 kHz; the float output's own step is about 6e-8), and the time for one 100 ms buffer.
  */
 @RunWith(AndroidJUnit4::class)
 class DspNativeTest {

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- The staging build (not debuggable) can be sampled with simpleperf from adb (CPU work, 11-testing-hardening.md). -->
+        <profileable android:shell="true" />
         <!-- Automation hooks for scripts\device.ps1 (debug builds only). DUMP: the shell holds it, apps do not. -->
         <receiver
             android:name="dev.trueform.player.DebugReceiver"
