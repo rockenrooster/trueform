@@ -364,6 +364,30 @@ Owner reports and what changed:
 - `scripts/env.ps1` `Test-TfDeviceFree` counted "nothing in front" as free: a run sent swipes to the 12R's dark,
   locked screen (no effect seen). The screen off or the lock screen up now counts as busy.
 
+12R session (the owner unlocked it for testing; debug build first, then staging):
+
+- **Staging build** (new: the test app built like a release, R8 and not debuggable, debug commands included;
+  `scripts\build.ps1 -Config staging`). The debug build is the wrong thing to judge smoothness with:
+
+  | 12R | debug build | staging |
+  |---|---|---|
+  | Library scroll (Songs, 722 tracks, playing), janky frames | 28–34 % | 6.5–7.8 % |
+  | … median / 95th percentile frame | 11–13 / 32–36 ms | 7–8 / 20–21 ms |
+  | Song swipes, janky frames (median frame) | 17 % (11 ms) | 3.2 % (10 ms) |
+  | Cold start (`am start -W`) | 685–741 ms | 144–171 ms (budget 700 ms) |
+
+  The scroll budget (95th percentile 8.3 ms) is still missed on the 12R; with the launcher's accessibility service
+  on, every scroll frame also pays for Compose's accessibility bookkeeping (2.5–4.4 ms in the debug trace), and new
+  rows are composed during the scroll. Swipes: frames during the drag 3–9 ms, during the glide 1–7 ms; the change
+  itself (one heavy frame) now falls after the artwork stops.
+- The screen-off CPU measurement was spoiled (the phone was woken during the two minutes: 28.7 %); not recorded as a
+  result. The earlier attempt on the locked phone could not start playback from the background (see above).
+- Slips this session: the first staging build lacked the debug receiver (its source folder was added to the wrong
+  source set), so the first debug command crashed the app; the weather app that had been behind it came to the
+  front, the script stopped, and its clean-up pressed Home over that app. The clean-up now presses Home only out of
+  Trueform, and the build was fixed (the receiver is checked in the APK).
+- A seek while paused is now saved (a restored position was lost when the app was closed right after).
+
 12R, locked with the screen off (the owner's phone, idle; their queue, position and EQ file restored afterwards):
 
 - Waveform analysis at background priority, screen off: two 3-minute 48 kHz FLACs in 3.1 s and 4.8 s. The budget

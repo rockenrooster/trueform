@@ -14,6 +14,8 @@ records what was built, measured and decided.
 - Builds and tests on this PC use at most 4 CPU cores: run them through `scripts\*.ps1` (they dot-source
   `scripts\env.ps1`), Gradle with `--max-workers=4`. Never run `gradlew --stop`.
 - Run builds and tests when a step needs them as proof, not by reflex.
+- Judge smoothness (frame times, jank) with the staging build (`scripts\build.ps1 -Config staging`: the test app built
+  like a release, debug commands included), never the debug build: Compose is several times slower when debuggable.
 - Git: `C:\Program Files\Git\cmd\git.exe -c http.sslBackend=schannel` (`Invoke-TfGit`). `gh` works as is.
 - Never read, print, copy or commit anything under `keys/`.
 
