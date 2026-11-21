@@ -131,6 +131,8 @@ class DebugReceiver : BroadcastReceiver() {
                 }
             }
             "cast_stop" -> g.cast?.stop()
+            "cast_blackout" -> g.cast?.server?.blackout(i.getLongExtra("ms", 8000))   // the Wi-Fi blip, simulated
+
             "cast_log" -> g.cast?.log?.lines()?.takeLast(i.getIntExtra("n", 40))?.forEach { Log.i(TAG, "castlog: $it") }
             "cast_http" -> {   // the cast server without a session, for the PC test of its routes (07-chromecast.md T2)
                 val base = g.cast?.startServerForTest()

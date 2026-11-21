@@ -90,8 +90,23 @@ class CastHttpServer(
         while (!s.isClosed) {
             val c = try { s.accept() } catch (_: Exception) { break }
             if (!c.inetAddress.isSiteLocalAddress && !c.inetAddress.isLoopbackAddress) { c.close(); continue }
+            if (android.os.SystemClock.elapsedRealtime() < blackoutUntil) { c.close(); continue }
             pool.execute { handle(c) }
         }
+    }
+
+    private val open = java.util.concurrent.ConcurrentHashMap.newKeySet<Socket>()
+    @Volatile private var blackoutUntil = 0L
+
+    /**
+     * Tests only (debug command): the network "drops" for [ms]: open transfers are cut and new connections refused,
+     * as when the receiver loses Wi-Fi for a moment (11-testing-hardening.md, the Wi-Fi blip, without switching the
+     * phone's Wi-Fi). The receiver should ask again with a range and play on.
+     */
+    fun blackout(ms: Long) {
+        blackoutUntil = android.os.SystemClock.elapsedRealtime() + ms
+        open.forEach { runCatching { it.close() } }
+        log.add("server: blackout for $ms ms")
     }
 
     private fun handle(c: Socket) {
@@ -99,6 +114,7 @@ class CastHttpServer(
         var line = ""
         var sent = 0L
         var outcome = "ok"
+        open.add(c)
         try {
             c.soTimeout = 15_000
             val input = BufferedInputStream(c.getInputStream())
@@ -142,6 +158,7 @@ class CastHttpServer(
         } catch (e: Exception) {
             outcome = e.javaClass.simpleName
         } finally {
+            open.remove(c)
             runCatching { c.close() }
             if (line.isNotEmpty()) log.add("http ${c.inetAddress.hostAddress} $line -> $outcome, ${sent / 1024} KB in ${System.currentTimeMillis() - started} ms")
         }
