@@ -32,7 +32,9 @@ class DebugReceiver : BroadcastReceiver() {
         val pending = goAsync()
         g.main.launch {
             try {
-                handle(g, cmd, intent)
+                // also the broadcast's result ("am broadcast" prints it): some phones drop the log lines of an app that
+                // is not debuggable, as the staging build is not
+                pending.resultData = handle(g, cmd, intent)
             } catch (t: Throwable) {
                 Log.e(TAG, "$cmd failed", t)
             } finally {
@@ -41,7 +43,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun handle(g: AppGraph, cmd: String, i: Intent) {
+    private suspend fun handle(g: AppGraph, cmd: String, i: Intent): String? {
         val p = g.corePlayer
         when (cmd) {
             "mute" -> p.volume = if (i.getBooleanExtra("on", true)) 0f else 1f
@@ -53,7 +55,7 @@ class DebugReceiver : BroadcastReceiver() {
             "scan" -> g.scanner.request(i.getBooleanExtra("full", false))
             "play_path" -> {
                 g.controller()   // binds the service, so the session and the notification exist
-                val path = (i.getStringExtra("path") ?: return).trimEnd('/')
+                val path = (i.getStringExtra("path") ?: return null).trimEnd('/')
                 val (ids, source) = withContext(Dispatchers.IO) {
                     val folder = g.db.long("SELECT id FROM folders WHERE path = ?", path)
                     if (folder != null) g.library.tracksUnder(folder, true) to QueueSource.Folder(folder, true, folder)
@@ -134,10 +136,10 @@ class DebugReceiver : BroadcastReceiver() {
             "dump" -> {}
             else -> Log.w(TAG, "unknown command $cmd")
         }
-        if (cmd != "render") dump(g)
+        return if (cmd != "render") dump(g) else null
     }
 
-    private suspend fun dump(g: AppGraph) {
+    private suspend fun dump(g: AppGraph): String {
         val p = g.corePlayer
         val q = g.queue.state.value
         val t = g.queue.currentTrack()
@@ -161,6 +163,7 @@ class DebugReceiver : BroadcastReceiver() {
             .put("remote", g.cast?.isRemote == true)
             .put("limitDb", (g.localDsp.limiter?.reductionDb ?: 0f).toDouble())
         Log.i("TFSTATE", o.toString())
+        return o.toString()
     }
 
     private companion object {

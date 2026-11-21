@@ -274,6 +274,11 @@ class QueueController(
         if (isPlaying) startTicker() else savePosition()
     }
 
+    /** A seek while paused is kept too (the app may be closed before it plays again). */
+    override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+        if (reason == Player.DISCONTINUITY_REASON_SEEK) savePosition()
+    }
+
     override fun onPlaybackStateChanged(playbackState: Int) {
         if (playbackState == Player.STATE_READY) errorsInRow = 0
     }

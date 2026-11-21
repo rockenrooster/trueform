@@ -1,6 +1,7 @@
-# Builds the APK on at most 4 cores.   scripts\build.ps1 [-Config debug|release] [-Task <gradle task>] [-Clean]
+# Builds the APK on at most 4 cores.   scripts\build.ps1 [-Config debug|staging|release] [-Task <gradle task>] [-Clean]
+# staging: the test app built like a release (R8, not debuggable), for judging smoothness on the phones.
 param(
-    [ValidateSet('debug', 'release')][string]$Config = 'debug',
+    [ValidateSet('debug', 'staging', 'release')][string]$Config = 'debug',
     [string]$Task = '',
     [switch]$Clean
 )

@@ -248,6 +248,9 @@ fun BoxScope.Placeholder(seed: String, icon: ImageVector?, showLetter: Boolean) 
 // --- rows ------------------------------------------------------------------------------------------------------------
 
 val LocalRowHeight = compositionLocalOf { 60.dp }
+/** The "Show file names" and "Swipe to queue" settings, read once for all rows (not one subscription per row). */
+val LocalShowFileNames = compositionLocalOf { false }
+val LocalSwipeToQueue = compositionLocalOf { true }
 
 /** A list row: thumbnail, two lines, trailing content. */
 @Composable

@@ -243,8 +243,7 @@ private fun FolderContent(folderId: Long?, roots: List<Folder>, ui: PlayerUi, ac
 @UnstableApi
 @Composable
 fun TrackRow(t: Track, current: Boolean, ui: PlayerUi, showNumber: Boolean = false, onLongClick: () -> Unit, onClick: () -> Unit) {
-    val g = LocalGraph.current
-    val names by g.settings.flow(S.showFileNames).collectAsState(g.settings[S.showFileNames])
+    val names = dev.trueform.player.ui.components.LocalShowFileNames.current
     val c = Tf.colors
     ListRow(
         title = if (names) t.baseName else t.displayTitle,
@@ -268,9 +267,7 @@ fun TrackRow(t: Track, current: Boolean, ui: PlayerUi, showNumber: Boolean = fal
 /** Swipe right: play next; left: add to queue (docs/plan/04-ui-ux.md). */
 @Composable
 fun SwipeRow(onPlayNext: () -> Unit, onQueue: () -> Unit, content: @Composable () -> Unit) {
-    val g = LocalGraph.current
-    val enabled by g.settings.flow(S.swipeToQueue).collectAsState(g.settings[S.swipeToQueue])
-    if (!enabled) { content(); return }
+    if (!dev.trueform.player.ui.components.LocalSwipeToQueue.current) { content(); return }
     val c = Tf.colors
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }

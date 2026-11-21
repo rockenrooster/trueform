@@ -54,6 +54,21 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
         }
+        // The test app (same id and debug key as debug, so it installs over it, debug commands included) built like a
+        // release: R8, not debuggable. Compose runs several times faster than in a debuggable build, so scrolling and
+        // swiping on the test phones look as they will for users. scripts\build.ps1 -Config staging
+        create("staging") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-staging"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
+    }
+    sourceSets.getByName("staging") {   // the debug commands (Kotlin: the kotlin set; the java set is not compiled by it)
+        kotlin.directories += "src/debug/java"
+        res.directories += "src/debug/res"
+        manifest.srcFile("src/debug/AndroidManifest.xml")
     }
 
     compileOptions {

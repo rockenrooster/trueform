@@ -125,6 +125,8 @@ fun AppRoot(g: AppGraph, needsSetup: Boolean, onSetupDone: () -> Unit, requestPe
     val theme by g.settings.flow(S.theme).collectAsState(g.settings[S.theme])
     val haptics by g.settings.flow(S.haptics).collectAsState(g.settings[S.haptics])
     val density by g.settings.flow(S.density).collectAsState(g.settings[S.density])
+    val fileNames by g.settings.flow(S.showFileNames).collectAsState(g.settings[S.showFileNames])
+    val swipeToQueue by g.settings.flow(S.swipeToQueue).collectAsState(g.settings[S.swipeToQueue])
     TrueformTheme(theme) {
         val dark = Tf.colors.isDark
         val view = androidx.compose.ui.platform.LocalView.current
@@ -136,7 +138,9 @@ fun AppRoot(g: AppGraph, needsSetup: Boolean, onSetupDone: () -> Unit, requestPe
             }
         }
         CompositionLocalProvider(LocalGraph provides g, LocalHaptics provides haptics,
-            LocalRowHeight provides if (density == Density.COMPACT) 48.dp else 60.dp) {
+            LocalRowHeight provides if (density == Density.COMPACT) 48.dp else 60.dp,
+            dev.trueform.player.ui.components.LocalShowFileNames provides fileNames,
+            dev.trueform.player.ui.components.LocalSwipeToQueue provides swipeToQueue) {
             Box(Modifier.fillMaxSize().background(Tf.colors.bg)) {
                 if (needsSetup) dev.trueform.player.ui.onboarding.Onboarding(requestPermission, onSetupDone)
                 else Main(g)
