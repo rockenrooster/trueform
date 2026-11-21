@@ -4,7 +4,6 @@ import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.roundToInt
-import kotlin.random.Random
 
 enum class PcmEncoding(val bytes: Int) { FLOAT32(4), INT24(3), INT16(2) }
 
@@ -103,7 +102,6 @@ class WavStream(
     private var pendOff = 0
     private var pendLen = 0
     private var skipInChunk = 0                 // bytes of the next chunk to drop (a seek into the middle of a frame)
-    private val dither = Random(0x7F4A7C15)
 
     fun seek(byteOffset: Long) {
         val target = byteOffset.coerceIn(0, length)
@@ -170,8 +168,9 @@ class WavStream(
                 bytes[o] = v.toByte(); bytes[o + 1] = (v shr 8).toByte(); bytes[o + 2] = (v shr 16).toByte()
             }
             PcmEncoding.INT16 -> for (i in 0 until n) {
-                // TPDF dither of ±1 LSB before rounding to 16 bits
-                val d = (dither.nextFloat() - dither.nextFloat()) / 32768f
+                // TPDF dither of ±1 LSB before rounding to 16 bits, drawn from the sample's place in the stream: a range
+                // (a receiver's seek or reconnect) then joins the whole stream bit for bit
+                val d = tpdf(framePos * 2 + i) / 32768f
                 val v = ((floats[i] + d).coerceIn(-1f, 1f) * 32767f).roundToInt()
                 val o = i * 2
                 bytes[o] = v.toByte(); bytes[o + 1] = (v shr 8).toByte()
@@ -183,5 +182,14 @@ class WavStream(
 
     companion object {
         const val CHUNK = 4096
+
+        /** Triangular noise in (-1, 1) for sample [k]: splitmix64 of the position, one 24-bit uniform minus another. */
+        internal fun tpdf(k: Long): Float {
+            var z = (k + 1) * -0x61c8864680b583ebL                 // 0x9E3779B97F4A7C15
+            z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L         // 0xBF58476D1CE4E5B9
+            z = (z xor (z ushr 27)) * -0x6b2fb644ecceee15L         // 0x94D049BB133111EB
+            z = z xor (z ushr 31)
+            return ((z ushr 40).toInt() - ((z ushr 16) and 0xFFFFFF).toInt()) / 16777216f
+        }
     }
 }

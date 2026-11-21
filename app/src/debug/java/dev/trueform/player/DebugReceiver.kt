@@ -47,6 +47,19 @@ class DebugReceiver : BroadcastReceiver() {
         val p = g.corePlayer
         when (cmd) {
             "mute" -> p.volume = if (i.getBooleanExtra("on", true)) 0f else 1f
+            "vol" -> p.volume = i.getFloatExtra("v", 0f)   // --ef v 0.001: -60 dB, to watch a fade without being heard
+            "sleep" -> g.sleepTimer.start(i.getIntExtra("min", 1))
+            "focus_grab" -> g.main.launch {   // a phone call's audio focus, simulated: transient focus for ms, then given back
+                val am = g.app.getSystemService(android.media.AudioManager::class.java)
+                val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    .setOnAudioFocusChangeListener { }.build()
+                Log.i(TAG, "focus_grab: ${am.requestAudioFocus(req)}")
+                kotlinx.coroutines.delay(i.getLongExtra("ms", 5000))
+                am.abandonAudioFocusRequest(req)
+            }
             "roots" -> {
                 val paths = (i.getStringExtra("paths") ?: "").split(',').map { it.trim().trimEnd('/') }.filter { it.isNotEmpty() }
                 withContext(Dispatchers.IO) { g.library.setScanRoots(paths.map { LibraryRepo.Root(it, true) }) }
@@ -168,6 +181,8 @@ class DebugReceiver : BroadcastReceiver() {
             .put("cast", g.cast?.state?.value?.let { "${it.phase} ${it.device ?: ""}".trim() } ?: "unavailable")
             .put("remote", g.cast?.isRemote == true)
             .put("limitDb", (g.localDsp.limiter?.reductionDb ?: 0f).toDouble())
+            .put("trackId", t?.id ?: -1).put("suppressed", p.playbackSuppressionReason)
+            .put("sleepMin", g.sleepTimer.remainingMin.value ?: -1).put("castBase", g.cast?.server?.baseUrl ?: "")
         Log.i("TFSTATE", o.toString())
         return o.toString()
     }

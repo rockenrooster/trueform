@@ -83,7 +83,8 @@ it serves one kind of client and three routes.
     and one cache serves the app and the receiver).
   - A range of a rendered WAV starts a fresh DSP chain: it decodes up to one second before the range and drops it, so
     the filters and the limiter's 5 ms look-ahead are where an uninterrupted stream has them (ranges join bit for bit;
-    measured on the Moto).
+    measured on the Moto). The 16-bit dither is drawn from each sample's position, so it joins too (it did not while
+    it came from a random generator that restarted with each range; found by the PC soak, 2026-11-21).
 - **Ranges**: `bytes=a-`, `bytes=a-b`, `bytes=-n`. Reply `206` with `Content-Range: bytes a-b/total`, or `200`
   without a range, or `416` with `Content-Range: bytes */total`. Always send `Content-Length`, `Accept-Ranges:
   bytes`, `Content-Type`, `Access-Control-Allow-Origin: *`, `Connection: close`. `OPTIONS` gets `204` with the CORS

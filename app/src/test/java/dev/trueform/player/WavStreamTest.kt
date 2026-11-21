@@ -104,8 +104,7 @@ class WavStreamTest {
 
     @Test
     fun seeksAnywhereGiveTheSameBytes() {
-        for (enc in PcmEncoding.entries) {
-            if (enc == PcmEncoding.INT16) continue   // dither: not repeatable across seeks
+        for (enc in PcmEncoding.entries) {   // INT16 too: its dither is drawn from the sample's position
             val whole = readAll(WavStream(FakeSource(20000), enc))
             for (off in listOf(0L, 3L, 43L, 44L, 45L, 44L + 7 * 2 * enc.bytes + 1, 44L + 10000 * 2 * enc.bytes, whole.size - 5L)) {
                 val s = WavStream(FakeSource(20000), enc)
@@ -114,6 +113,16 @@ class WavStreamTest {
                 assertArrayEquals("$enc at $off", whole.copyOfRange(off.toInt(), whole.size), got)
             }
         }
+    }
+
+    @Test
+    fun ditherIsTriangularNoise() {
+        val xs = (0L until 100_000L).map { WavStream.tpdf(it).toDouble() }
+        assertTrue(xs.all { it > -1 && it < 1 })
+        val mean = xs.average()
+        val variance = xs.sumOf { (it - mean) * (it - mean) } / xs.size
+        assertTrue("mean $mean", abs(mean) < 0.01)
+        assertTrue("variance $variance", variance in 0.16..0.173)   // the difference of two uniforms: 1/6
     }
 
     @Test

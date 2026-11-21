@@ -450,8 +450,10 @@ left adb at 00:16):
   reached the third. Fixed: the header and the list move as two layers and the box that measures the swipe stays
   put; past a third goes up unless flung back left. Retested: 650 px in 2.6 s and in 1.2 s go up, the rest as
   before, and the page now follows the finger one to one. Release build 31 has the bug; build 33 has the fix.
-- **Library scroll, before and after the list drawing cuts** (Songs, 606-track bench library, playing, compiled; two
-  rounds of 16 flings per build):
+- **Library scroll, before and after the list drawing cuts** (Songs, 606-track bench library, compiled; two rounds of
+  16 flings per build). Paused, not playing as intended: the script's start command passed a folder path with a
+  space, which adb's remote shell split (`scripts\device.ps1` quotes such paths; the throwaway script did not). Both
+  builds ran the same way, so the comparison holds:
 
   | Moto | round 1 | round 2 |
   |---|---|---|
@@ -459,5 +461,42 @@ left adb at 00:16):
   | after (build 33) | 6.1 %, 19 ms | 0.00 %, 8 ms |
 
   Each build has a clean round and a round with about 6 % janky frames in which the GPU's 90th percentile goes from
-  5 to 14–15 ms: the misses come and go with the GPU's state, not with the build. The cuts make no measurable
-  difference on the Moto; on the 12R they are not measured yet.
+  5 to 14–15 ms: the misses come and go with the GPU's state, not with the build. Paused, the cuts make no
+  measurable difference. **Playing** (the run repeated an hour later, playback started properly, muted):
+
+  | Moto, playing | round 1 | round 2 |
+  |---|---|---|
+  | before the cuts | 4.9 % janky, 95th percentile 16 ms, 47 frames with slow draw commands | 4.6 %, 16 ms, 50 |
+  | after (build 33) | 2.7 %, 15 ms, 8 | 2.7 %, 15 ms, 13 |
+
+  While playing, the cuts (chiefly the mini player's waveform drawn without an offscreen layer) take janky frames
+  from about 4.7 % to 2.7 % and the GPU's 90th percentile from 6–9 ms to 5 ms. The 12R is not measured yet.
+- **M8 checks that need no Bluetooth hardware** (08-bluetooth-system.md, hardware checks 3, 6 and 7), Moto,
+  Android 11, staging build, muted:
+  - Shuffle and repeat from the system media controls (the media player in the notification shade): shuffle on →
+    off → on, repeat all → one → off → all; the app followed every tap.
+  - Sleep timer of 1 minute with fade (app volume at -40 dB, on a speaker whose media volume is 0): the fade starts
+    at 50 s and falls evenly to 0 at 60 s; at 62 s playback is paused, the timer is off, and the volume is back for
+    the next play.
+  - A phone call, simulated by another holder of audio focus (`focus_grab`: transient focus with the voice-call
+    usage for 7 s; the Moto has no SIM): with "Resume after an interruption" on, playback is held while the focus is
+    away and carries on when it returns; with it off, playback pauses for good. A real call takes the same audio
+    focus path; a real call is left for the owner's phone.
+  - New debug commands for these: `vol`, `sleep`, `focus_grab`; the dump also gives the track id, the suppression
+    reason, the sleep timer's minutes and the cast server's address.
+- **Cast server soak with the PC as the receiver** (the night rules out the household's Cast speakers and TVs; the
+  real-receiver soak and Wi-Fi blip stay for the daytime with the owner). The PC pulls the rendered WAV of a
+  12-minute MP3 (`/r/<id>.wav`, 16-bit 44.1 kHz) from the Moto's server at real-time pace with a 20 s lead and a
+  receiver-sized socket buffer, as a receiver's player does, looping the track for 15 minutes; at minute 5 the
+  server drops every connection and refuses new ones for 8 s (`cast_blackout`). Log:
+  `captures/cast-pc-soak-moto-20261121-0114.jsonl`. Result: 15.7 minutes, one reconnect (the drop: the client saw it
+  4 s later, its retries were refused until the 8 s were over, then a `206` resumed at the exact byte), at most
+  4.2 s without data, the lead never under the 2 s start buffer, no buffering period, every response a `206`.
+- **Found: a resumed range was not bit-identical** to the uninterrupted render (07-chromecast.md says ranges join bit
+  for bit). Two whole renders were equal; a range differed only in its dither: every sample within ±2 LSB (55 %
+  equal, 43 % ±1), the music itself identical, so inaudible. The 16-bit dither came from a random generator that
+  started over with every range. Fixed: the dither is now drawn from the sample's position (splitmix64, cheaper
+  than the generator it replaces), so a range rebuilds the same noise. `WavStreamTest` now checks 16-bit seeks too
+  (it skipped them, "not repeatable across seeks") and that the dither is triangular (mean 0, variance 1/6).
+  Verified on the Moto: a range from the soak's resume point and one from an odd byte inside a sample equal the
+  whole render from there, byte for byte.
