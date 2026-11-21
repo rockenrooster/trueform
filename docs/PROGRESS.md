@@ -438,3 +438,26 @@ Owner reports and what changed:
   background, so the debug `play` command did nothing on the locked phone. Not a defect for users (playback starts
   from the app, the notification or a media button); the measurement has to start playback with the app in front,
   then turn the screen off.
+
+Night of 20–21 November, Moto, staging build, muted (a slot agreed with the session that shares the phone; the 12R
+left adb at 00:16):
+
+- **Folder browser, swipe right to go up**, three levels deep (TrueformTest › Northern Static › Afterlight): flings
+  went up a level each time and stopped at the top folder; a swipe left on a song still adds it to the queue (queue
+  4 → 5); a short drag springs back; a mostly vertical drag scrolls. **Bug:** a slow drag past a third of the width
+  did not go up (650 px in 0.7, 1.2 and 2.6 s). The swipe was measured inside the page it moves, so the finger's
+  position was read in a frame that moved with it: the page followed at about half the finger's speed and never
+  reached the third. Fixed: the header and the list move as two layers and the box that measures the swipe stays
+  put; past a third goes up unless flung back left. Retested: 650 px in 2.6 s and in 1.2 s go up, the rest as
+  before, and the page now follows the finger one to one. Release build 31 has the bug; build 33 has the fix.
+- **Library scroll, before and after the list drawing cuts** (Songs, 606-track bench library, playing, compiled; two
+  rounds of 16 flings per build):
+
+  | Moto | round 1 | round 2 |
+  |---|---|---|
+  | before (build without the cuts) | 0.06 % janky, 95th percentile 8 ms | 6.0 %, 19 ms |
+  | after (build 33) | 6.1 %, 19 ms | 0.00 %, 8 ms |
+
+  Each build has a clean round and a round with about 6 % janky frames in which the GPU's 90th percentile goes from
+  5 to 14–15 ms: the misses come and go with the GPU's state, not with the build. The cuts make no measurable
+  difference on the Moto; on the 12R they are not measured yet.

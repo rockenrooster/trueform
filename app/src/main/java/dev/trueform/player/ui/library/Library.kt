@@ -117,31 +117,37 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
     val scope = rememberCoroutineScope()
     val swipe = remember { Animatable(0f) }
 
-    Column(Modifier.fillMaxSize()
-        .graphicsLayer { translationX = swipe.value }
-        .statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (folderId != null) 4.dp else 16.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            if (folderId != null) IconBtn(TfIcons.Back, "Up one folder") { actions.back() }
-            T(title, Tf.type.title, modifier = Modifier.weight(1f, fill = false).padding(start = if (folderId != null) 4.dp else 0.dp, end = 8.dp))
-            UpdatePill(actions)
-            Spacer(Modifier.weight(1f))
-            IconBtn(TfIcons.Search, "Search") { actions.open(Dest.Search) }
-            CastButton(actions)
-            IconBtn(TfIcons.Settings, "Settings") { actions.open(Dest.Settings()) }
+    // The page follows a swipe up a folder (swipeUp) in two layers, so the box that measures the swipe stays put: inside
+    // the moving page the finger would be measured in a frame that moves with it, and the page would follow at half
+    // speed and never reach the third of the width a slow drag needs.
+    val follow = Modifier.graphicsLayer { translationX = swipe.value }
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(follow) {
+            Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (folderId != null) 4.dp else 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                if (folderId != null) IconBtn(TfIcons.Back, "Up one folder") { actions.back() }
+                T(title, Tf.type.title, modifier = Modifier.weight(1f, fill = false).padding(start = if (folderId != null) 4.dp else 0.dp, end = 8.dp))
+                UpdatePill(actions)
+                Spacer(Modifier.weight(1f))
+                IconBtn(TfIcons.Search, "Search") { actions.open(Dest.Search) }
+                CastButton(actions)
+                IconBtn(TfIcons.Settings, "Settings") { actions.open(Dest.Settings()) }
+            }
+            if (tab == "folders" && ancestry.size > 1) {
+                Breadcrumbs(ancestry.map { it.name }) { i -> nav.replaceFolderPath(ancestry.take(i + 1).drop(if (folderId == null || roots.size == 1) 1 else 0).map { it.id }) }
+            }
+            Tabs(tabs.map { TAB_LABELS.getValue(it) }, tabs.indexOf(tab)) { actions.tab(it) }
+            if (scan.phase != Scanner.Phase.IDLE) ScanLine(scan)
         }
-        if (tab == "folders" && ancestry.size > 1) {
-            Breadcrumbs(ancestry.map { it.name }) { i -> nav.replaceFolderPath(ancestry.take(i + 1).drop(if (folderId == null || roots.size == 1) 1 else 0).map { it.id }) }
-        }
-        Tabs(tabs.map { TAB_LABELS.getValue(it) }, tabs.indexOf(tab)) { actions.tab(it) }
-        if (scan.phase != Scanner.Phase.IDLE) ScanLine(scan)
         Box(Modifier.weight(1f).then(if (folderId != null && tab == "folders") Modifier.swipeUp(swipe, scope) { actions.back() } else Modifier)) {
-            when (tab) {
-                "folders" -> FolderContent(effectiveFolder, roots, ui, actions)
-                "albums" -> AlbumsTab(actions)
-                "artists" -> ArtistsTab(actions)
-                "songs" -> SongsTab(ui, actions)
-                "playlists" -> PlaylistsTab(actions)
+            Box(Modifier.fillMaxSize().then(follow)) {
+                when (tab) {
+                    "folders" -> FolderContent(effectiveFolder, roots, ui, actions)
+                    "albums" -> AlbumsTab(actions)
+                    "artists" -> ArtistsTab(actions)
+                    "songs" -> SongsTab(ui, actions)
+                    "playlists" -> PlaylistsTab(actions)
+                }
             }
         }
     }
@@ -175,7 +181,8 @@ private fun Modifier.swipeUp(offset: Animatable<Float, AnimationVector1D>, scope
                 scope.launch { offset.snapTo((dx - slop).coerceAtLeast(0f)) }
             }
             if (!dragging) return@awaitEachGesture
-            if (offset.value > size.width / 3f || velocity.calculateVelocity().x > 1200f) onUp()
+            val vx = velocity.calculateVelocity().x   // past a third goes up unless flung back left
+            if (vx > 1200f || (offset.value > size.width / 3f && vx > -1200f)) onUp()
             else scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f)) }
         }
     }
