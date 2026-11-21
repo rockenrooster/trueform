@@ -390,6 +390,18 @@ Owner reports and what changed:
   front, the script stopped, and its clean-up pressed Home over that app. The clean-up now presses Home only out of
   Trueform, and the build was fixed (the receiver is checked in the APK).
 - A seek while paused is now saved (a restored position was lost when the app was closed right after).
+- Library scroll, staging, traced (`atrace`, 8 flings, 722 tracks, playing): 11.3 % janky frames this run; only 3
+  frames were slow on the UI thread; the misses are "slow issue draw commands" and GPU time (GPU median 2 ms, 90th
+  percentile 12 ms). The render thread itself: median 3.0 ms, 90th percentile 6.1 ms per frame, 5 of 552 over 8 ms,
+  spread over command flush, buffer swap (`queueBuffer` about 1.5 ms) and layers; no shader compiles or texture
+  uploads. The GPU runs at a low clock until a fling starts. The 95th-percentile budget (8.3 ms, measured as gfxinfo
+  frame time including the GPU) stays missed; what remains is outside the app's main thread.
+- UI timers (waveform ticks, time labels, limiter meter, position anchor) now park while the app is not visible, so
+  they no longer wake the main thread with the screen off (not yet measured: both phones were taken by another
+  session).
+- The 15-minute cast soak and the simulated network drop (`cast_blackout`, new) were postponed: at 22:46 the cast
+  devices on the network were bedroom and bathroom speakers and TVs (a session can chime or switch a TV on, even at
+  volume 0). To run in the daytime.
 
 12R, locked with the screen off (the owner's phone, idle; their queue, position and EQ file restored afterwards):
 
