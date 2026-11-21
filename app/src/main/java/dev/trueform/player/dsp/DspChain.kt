@@ -207,7 +207,11 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
         companion object {
             fun build(p: DspParams, fs: Int): Stage {
                 val rate = fs.toDouble()
-                val all = if (p.eqOn) EqDesign.designAll(p.filters, rate) else emptyList()
+                // Gain filters within 0.02 dB of flat are left out: the band correction gives bands left at 0 dB gains
+                // like -0.011 or -0.0002 dB, inaudible, yet each cost as much as a real band (half the filters of a
+                // typical preset). Their effect on the curve is at most 0.02 dB at their own frequency.
+                val used = p.filters.filter { it.type == FilterType.LOW_PASS || it.type == FilterType.HIGH_PASS || kotlin.math.abs(it.gainDb) >= NEGLIGIBLE_DB }
+                val all = if (p.eqOn) EqDesign.designAll(used, rate) else emptyList()
                 val active = all.filter { !it.isIdentity }
                 val preamp = when {
                     !p.eqOn -> 0.0
@@ -222,6 +226,8 @@ class DspChain(private val params: () -> DspParams) : FrameProcessor {
 
     companion object {
         private const val FADE = 2048
+        /** A gain filter closer to flat than this is not run (see Stage.build). */
+        const val NEGLIGIBLE_DB = 0.02
         /** The EQ's filters in native code where the library loads; a device test switches it off to compare. */
         @Volatile var nativeCascade: Boolean = dev.trueform.player.audio.NativeCheck.loaded
     }

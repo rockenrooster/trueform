@@ -413,9 +413,13 @@ Owner reports and what changed:
   - Results: 12R, background, screen on, EQ on: 3.35 % (playback thread 2.61) just after the install; **2.88 %**
     (playback 2.22) once Android has compiled the app (`cmd package compile -m speed`, what background optimisation
     does on users' phones within a day). Moto, **screen off**, EQ on, compiled: **3.13 %** (release build 13 was 6.1 %);
-    EQ off 1.80 %. The 3 % budget is met on the 12R as measured (screen on, app in the background; the screen-off run
-    cannot be done there without locking the owner's phone) and missed by a hair on the slower Moto with the screen
-    off.
+    EQ off 1.80 %.
+  - Gain filters within 0.02 dB of flat are not run: the band correction leaves bands set to 0 dB at gains like
+    -0.011 or -0.0002 dB (inaudible), each as costly as a real band; in the test preset 5 of 10 filters
+    (`DspTest`: the response moves by 0.02 dB at most, 20 Hz–20 kHz).
+  - ExoPlayer's playback loop wakes about 8 times a second (dynamic scheduling works); nothing to gain there.
+  - **Result: Moto, screen off, 10-band EQ, compiled: 2.39 % of one core — the 3 % budget is met**, on the slower
+    phone (6.1 % in release build 13). The 12R is faster still (2.88 % before this last step, screen on).
 - The 15-minute cast soak and the simulated network drop (`cast_blackout`, new) were postponed: at 22:46 the cast
   devices on the network were bedroom and bathroom speakers and TVs (a session can chime or switch a TV on, even at
   volume 0). To run in the daytime.

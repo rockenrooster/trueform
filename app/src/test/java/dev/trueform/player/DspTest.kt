@@ -265,4 +265,18 @@ class DspTest {
         }
         for (i in outA.indices) if (outA[i] != outB[i]) fail("sample $i differs: ${outA[i]} vs ${outB[i]}")
     }
+
+    @Test
+    fun negligibleFiltersAreLeftOutWithoutChangingTheCurve() {   // a bass boost: the correction leaves tiny gains above
+        val fs = 44100.0
+        val specs = EqDesign.graphicSpecs(BandLayout.B10, EqDesign.correctedGains(BandLayout.B10, floatArrayOf(6f, 5f, 4f, 2f, 0f, 0f, 0f, 0f, 0f, 0f), 12f))
+        val used = specs.filter { abs(it.gainDb) >= DspChain.NEGLIGIBLE_DB }
+        assertTrue("filters left out: ${specs.size - used.size}", used.size <= specs.size - 4)
+        val all = EqDesign.designAll(specs, fs)
+        val kept = EqDesign.designAll(used, fs)
+        var worst = 0.0
+        var f = 20.0
+        while (f < 20000) { worst = max(worst, abs(EqDesign.responseDb(all, fs, f) - EqDesign.responseDb(kept, fs, f))); f *= 1.02 }
+        assertTrue("response moved by $worst dB", worst <= 0.02)
+    }
 }
