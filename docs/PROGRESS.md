@@ -345,6 +345,24 @@ Owner reports and what changed:
   a second (GPU median 9 ms on the Moto); track changes 36 % janky frames, as before (GPU-bound on the Moto).
 - Waveform analysis with the new resolution, Moto, app in front: FLAC 16/44.1 of 95 s, 110 s and 150 s in 762, 529
   and 741 ms, about 1.2–1.9 s for four minutes (budget 4 s).
+- **Swiping between songs "a little jumpy"** (owner, 12R). A system trace (`atrace`, 10 s, three swipes, debug build)
+  showed: the track change ran inside the touch handler (16 ms) and recomposed and re-measured the new song's screen
+  while the artwork slid (frames of 23–52 ms in the middle of the motion); with an accessibility service on (the
+  12R's launcher has one for its gestures) Compose compared the whole semantics tree two or three times a second (up
+  to 18.6 ms each); and the playing row's animated bars recomposed and re-measured every frame while music played,
+  even in the library hidden under the player. Now:
+  - The swipe works like a pager: the neighbouring song comes in beside the current one as you drag; on release both
+    carry on at the finger's speed (critically damped spring, settles in about 0.3 s), and only then does the track
+    change, showing nothing new. A flick is enough. Full player and mini player.
+  - The playing bars are drawn in the draw phase and rest while the player covers the list.
+  - Waveform bitmaps and the centred bar's bars are worked out on a background thread.
+  - The library under the open player, the per-second time labels and the placeholder letters are not offered to
+    accessibility (the seek bar reads the position; TalkBack could reach the hidden rows before).
+  - On the Moto (no accessibility service), frames during the drag and the glide are 2–9 ms of main-thread work; the
+    work of the change itself (40–60 ms in the debug build) now falls after the artwork has stopped. The debug build
+    is several times slower than a release build on these paths.
+- `scripts/env.ps1` `Test-TfDeviceFree` counted "nothing in front" as free: a run sent swipes to the 12R's dark,
+  locked screen (no effect seen). The screen off or the lock screen up now counts as busy.
 
 12R, locked with the screen off (the owner's phone, idle; their queue, position and EQ file restored afterwards):
 
