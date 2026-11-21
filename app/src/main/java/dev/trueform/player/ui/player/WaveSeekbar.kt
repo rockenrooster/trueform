@@ -23,6 +23,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameMillis
 import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,7 +113,9 @@ fun WaveSeekbar(
     // Redraw when the playhead has moved about half a pixel, not every frame: a 3-minute track across a phone needs
     // about ten redraws a second, and the screen can stay idle in between.
     val tick by produceState(0L, playing, durationMs) {
-        if (playing) while (true) { delay((durationMs / widthPx[0].coerceAtLeast(1) / 2).coerceIn(16L, 500L)); value++ }
+        // after each wait, also wait for a frame: frames come only while the app is visible, so with the screen off
+        // this parks instead of waking the main thread several times a second
+        if (playing) while (true) { delay((durationMs / widthPx[0].coerceAtLeast(1) / 2).coerceIn(16L, 500L)); withFrameMillis { }; value++ }
     }
     var dragX by remember { mutableStateOf<Float?>(null) }
     var lastLiveSeek by remember { mutableStateOf(0L) }
@@ -225,7 +228,9 @@ private fun CentredWave(
     val scope = rememberCoroutineScope()
     val msPerPx = remember { floatArrayOf(30f) }
     // The waveform moves about a pixel every 30 ms on a phone: redraw at that pace while playing, not every frame.
-    val tick by produceState(0L, playing) { if (playing) while (true) { delay(msPerPx[0].toLong().coerceIn(16L, 250L)); value++ } }
+    val tick by produceState(0L, playing) {   // parks while the app is not visible (see the whole-track bar)
+        if (playing) while (true) { delay(msPerPx[0].toLong().coerceIn(16L, 250L)); withFrameMillis { }; value++ }
+    }
     /** The track time under the playhead while dragging or gliding; null otherwise. */
     var scrub by remember { mutableStateOf<Float?>(null) }
     val glide = remember { arrayOfNulls<Job>(1) }

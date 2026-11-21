@@ -40,6 +40,7 @@ class PlayerUi(private val g: AppGraph, scope: CoroutineScope) : Player.Listener
         scope.launch {
             while (true) {
                 delay(1000)
+                androidx.compose.runtime.withFrameMillis { }   // parks while the app is not visible (screen off)
                 if (isPlaying) reanchor()
             }
         }

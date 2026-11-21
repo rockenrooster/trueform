@@ -348,6 +348,7 @@ fun NowPlaying(
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(250)
+            androidx.compose.runtime.withFrameMillis { }   // parks while the app is not visible
             val l = g.localDsp.limiter
             limitDb.value = l?.reductionDb ?: 0f
             l?.clearPeak()
@@ -501,8 +502,8 @@ fun onColor(bg: Color): Color = if ((bg.red * 0.299f + bg.green * 0.587f + bg.bl
 
 @Composable
 private fun PositionText(ui: PlayerUi, modifier: Modifier, remaining: Boolean, total: Boolean = false) {
-    val frame by androidx.compose.runtime.produceState(0L, ui.isPlaying) {
-        if (ui.isPlaying) while (true) { kotlinx.coroutines.delay(250); value++ }
+    val frame by androidx.compose.runtime.produceState(0L, ui.isPlaying) {   // parks while the app is not visible
+        if (ui.isPlaying) while (true) { kotlinx.coroutines.delay(250); androidx.compose.runtime.withFrameMillis { }; value++ }
     }
     @Suppress("UNUSED_EXPRESSION") frame
     val pos = ui.position()
