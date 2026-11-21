@@ -337,6 +337,14 @@ Owner reports and what changed:
   (JVM): blob round trip with any column count, column bounds, zoomed bar pooling with partial data.
 - The player's accent no longer flashes the theme colour between tracks (the previous artwork's colours stay until
   the new ones are ready).
+- Centred seek bar checked on the Moto (debug build, muted): the playhead stays in the middle, bars and the smooth
+  outline draw with faded ends, the bubble shows target and offset while scrubbing; a 300 px drag moves about 9.4 s
+  (30 s across the bar); a tap 300 px right of the middle seeks the same amount forward; a flick glides on (friction
+  5: a fast 300 px flick about 5 s further, a moderate one about 2 s). A flick to the end used to jump into the next
+  track: scrubbing now stops a second before the end. While playing with the player open it redraws about 37 times
+  a second (GPU median 9 ms on the Moto); track changes 36 % janky frames, as before (GPU-bound on the Moto).
+- Waveform analysis with the new resolution, Moto, app in front: FLAC 16/44.1 of 95 s, 110 s and 150 s in 762, 529
+  and 741 ms, about 1.2–1.9 s for four minutes (budget 4 s).
 
 12R, locked with the screen off (the owner's phone, idle; their queue, position and EQ file restored afterwards):
 
