@@ -511,3 +511,35 @@ left adb at 00:16):
   back to the library root; a scripted Back then closed the app and the weather app behind it came forward, and one
   scripted tap landed on its first-run screen (on its logo: nothing changed; the phone was put back at the launcher).
   The overrides now keep the app's state; the scripts tap only what the screen dump shows.
+- **Memory** (11-testing-hardening.md task 6, capped at 15 minutes): playing (muted), Songs-tab flings every 20 s,
+  staging build: total PSS 104 MB at the start, 114.4 MB at 5 minutes, 114.5 at 10, 126.1 at 15 while scrolling,
+  107.3 MB a minute later at rest (Java heap 20, native 19, graphics buffers 39 MB). No growth that stays; the
+  plan's hour with samples 30 minutes apart is the owner's to run.
+- **Lifecycle checks** (task 3, this app only), Moto:
+  - Rotation (this app's orientation, not the phone's): **the screen fell back to the library's first tab** (Songs
+    became Folders), and an open player or sheet would have closed: navigation lived in plain `remember` and the
+    activity was recreated. The activity now handles orientation, size, density, font scale and night-mode changes
+    itself (Compose redraws for them), so rotation, split screen and a system dark-mode switch keep every screen.
+    Checked: Songs stays Songs, same process; the landscape layout draws.
+  - Theme change (Light, then Dark): no crash, state kept.
+  - Process death in the background (paused, Home, then the process ended): `am kill` leaves it alone while its
+    media service lives, so the debug `die` ended it as the system would; on restart the queue, the track and the
+    position (58,363 ms) were exactly as before.
+  - Storage permission revoked while running (`pm revoke` on our package): Android ends the app; it opens on its
+    welcome screen ("Get started"); with the permission granted again: library (20 tracks), queue and track as
+    before.
+  - Not run: split screen with another app and removing storage (another app and an SD card would be needed).
+- **Resampler alias level** (01-native-decoder.md T6 item 7; new `ResamplerAliasTest` on the Moto): one-second
+  tones made at 96 kHz with 50 ms fades, played at 44.1 kHz; output level against the tone:
+
+  | quality | 20 kHz | 22.6 kHz | 23 kHz | 24 kHz | 26 kHz and up |
+  |---|---|---|---|---|---|
+  | 0 Normal | -1.3 dB | -15.3 | -19.9 | -36.5 | -91.5 to -115 |
+  | 1 High (default) | -0.1 | -21.2 | -31.9 | -86.9 | -127 to -136 |
+  | 2 Very high | -0.0 | -38.9 | -76.1 | -138.4 | -140 to -143 |
+
+  Passband to 10 kHz within 0.1 dB at every quality, no sample beyond full scale. The default stays above -100 dB
+  only for content within 2 kHz above the output's Nyquist frequency (its aliases land at 20–22 kHz, where music
+  carries little at those levels); from 26 kHz up it is below -127 dB. libsoxr is not needed (the plan's condition
+  read as audible aliasing); "Very high" is there for anyone who wants it. With abrupt tone starts the filter rang:
+  one sample reached 1.04 at High for a -1 dBFS 22.6 kHz tone, as any steep filter would on a step.

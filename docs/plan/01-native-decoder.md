@@ -145,7 +145,9 @@ Open:
    | 2 Very high | `filter_size=128`, `cutoff=0.985`, `filter_type=kaiser`, `kaiser_beta=14`, `exact_rational=1` |
 
    These numbers are starting values: `// ponytail: swresample's own resampler; build with libsoxr if a
-   measurement shows aliasing above -100 dB`. Check with the sweep test in T6.
+   measurement shows aliasing above -100 dB`. Check with the sweep test in T6. Measured 2026-11-21
+   (`ResamplerAliasTest`, 96 → 44.1 kHz): High is below -127 dB from 26 kHz up and -87 dB at 24 kHz; only content
+   within 2 kHz above Nyquist aliases higher (into 20–22 kHz). Very high is below -138 dB from 24 kHz. No libsoxr.
 4. Total frames: from the stream duration (`AVStream.duration` in its time base, else `AVFormatContext.duration`),
    scaled to the output rate. `exact = (fmt->duration_estimation_method != AVFMT_DURATION_FROM_BITRATE)`.
 
