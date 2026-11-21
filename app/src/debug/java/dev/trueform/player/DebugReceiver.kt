@@ -71,10 +71,14 @@ class DebugReceiver : BroadcastReceiver() {
             "jump" -> g.queue.jump(i.getIntExtra("index", 0))
             "shuffle" -> g.queue.setShuffle(i.getStringExtra("v") == "on")
             "repeat" -> g.queue.setRepeat(when (i.getStringExtra("v")) { "all" -> Repeat.ALL; "one" -> Repeat.ONE; else -> Repeat.OFF })
-            "eq" -> {   // --es bands "4.5,3.5,..." (10 values) --ez on true
+            "eq" -> {   // --es bands "4.5,3.5,..." (10 values) --ez on true --es mode GRAPHIC|TONE
+                i.getStringExtra("mode")?.let { g.dsp.setMode(dev.trueform.player.dsp.EqMode.valueOf(it)) }
                 i.getStringExtra("bands")?.let { s -> g.dsp.setBands(s.split(',').map { it.trim().toFloat() }.toFloatArray()) }
                 if (i.hasExtra("on")) g.dsp.setOn(i.getBooleanExtra("on", true))
             }
+            // the owner's EQ kept before a measurement and put back exactly after it (no run-as on the staging build)
+            "eq_keep" -> keptEq = g.dsp.state.value
+            "eq_back" -> keptEq?.let { k -> g.dsp.update { k } }
             "render" -> withContext(Dispatchers.IO) {
                 // The local DSP chain over a whole file, written as float WAV (docs/plan/06-dsp-equalizer.md exit check).
                 val path = i.getStringExtra("path") ?: return@withContext
@@ -168,5 +172,6 @@ class DebugReceiver : BroadcastReceiver() {
 
     private companion object {
         const val TAG = "TFDEBUG"
+        var keptEq: dev.trueform.player.dsp.EqState? = null
     }
 }
