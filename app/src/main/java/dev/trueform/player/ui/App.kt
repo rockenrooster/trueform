@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -232,9 +233,12 @@ private fun Main(g: AppGraph) {
         val panel = minOf(480.dp, maxWidth * 0.42f)
         val wide = maxWidth >= 840.dp && maxHeight >= 600.dp && ui.hasMedia && ui.track != null   // not a phone on its side
         Row(Modifier.fillMaxSize()) {
-        // not drawn while the open player covers it
-        Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = if (!wide && expand.value > 0.999f) 0f else 1f }) {
+        // not drawn while the open player covers it, and not offered to accessibility (TalkBack would reach hidden rows,
+        // and any accessibility service, a launcher's gestures included, makes Compose compare these nodes on changes)
+        Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = if (!wide && expand.value > 0.999f) 0f else 1f }
+            .then(if (playerOpen && !wide) Modifier.clearAndSetSemantics {} else Modifier)) {
             Box(Modifier.weight(1f)) {
+                CompositionLocalProvider(dev.trueform.player.ui.components.LocalCovered provides (playerOpen && !wide)) {
                 AnimatedContent(
                     nav.top,
                     transitionSpec = {
@@ -255,6 +259,7 @@ private fun Main(g: AppGraph) {
                             Dest.Folders -> FolderPicker(onDone = { actions.back() }, onBack = { actions.back() })
                         }
                     }
+                }
                 }
             }
             if (ui.hasMedia && ui.track != null && !wide) {

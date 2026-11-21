@@ -150,11 +150,12 @@ function Get-TfHomePackage {
     return ($line -split '/')[0].Trim()
 }
 
-# True when only the launcher or Trueform (debug or release) is in front: nobody else is using the phone.
+# True when the launcher or Trueform (debug or release) is in front: nobody else is using the phone. Nothing in front
+# (screen off, or the lock screen up) is not free: input would land on the lock screen.
 function Test-TfDeviceFree {
     param([Parameter(Mandatory)][string]$Serial)
     $fg = Get-TfForegroundPackage $Serial
-    return ($fg -eq '' -or $fg -eq (Get-TfHomePackage $Serial) -or $fg -like 'dev.trueform.player*')
+    return ($fg -ne '' -and ($fg -eq (Get-TfHomePackage $Serial) -or $fg -like 'dev.trueform.player*'))
 }
 
 function Get-TfPid {

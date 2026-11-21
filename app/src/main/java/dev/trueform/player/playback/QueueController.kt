@@ -302,6 +302,21 @@ class QueueController(
     }
 
     fun currentTrack(): Track? = _state.value.current?.let { tracks[it.trackId] ?: library.track(it.trackId) }
+
+    /**
+     * The track a swipe would bring in: the next one ([dir] 1) or the previous one (-1), as the player moves (around the
+     * ends only when repeating all; "repeat one" steps on like "off").
+     */
+    fun neighbour(dir: Int): Track? {
+        val s = _state.value
+        if (s.entries.isEmpty()) return null
+        var i = s.index + dir
+        if (i !in s.entries.indices) {
+            if (s.repeat != Repeat.ALL) return null
+            i = Math.floorMod(i, s.entries.size)
+        }
+        return track(s.entries[i].trackId)
+    }
     fun trackOf(entry: QueueEntry): Track? = tracks[entry.trackId]
     /** Main thread; reads the library only for a track the queue has not loaded. */
     fun track(trackId: Long): Track? = tracks[trackId] ?: library.track(trackId)?.also { tracks[trackId] = it }

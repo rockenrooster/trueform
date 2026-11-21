@@ -98,6 +98,8 @@ class PlayerUi(private val g: AppGraph, scope: CoroutineScope) : Player.Listener
 
     fun canGoNext() = p.hasNextMediaItem()
     fun canGoBack() = p.hasPreviousMediaItem()
+    /** The track beside the current one for a swipe: next ([dir] 1) or previous (-1); null where there is none. */
+    fun neighbour(dir: Int): Track? = if (if (dir > 0) canGoNext() else canGoBack()) g.queue.neighbour(dir) else null
 
     private var intent = 1
     private var intentAt = 0L

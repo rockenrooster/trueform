@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -236,7 +237,8 @@ fun BoxScope.Placeholder(seed: String, icon: ImageVector?, showLetter: Boolean) 
     val palette = listOf(c.waveLow, c.waveMid, c.waveHigh, Color(0xFF9CF0B8), Color(0xFFB79CFF), Color(0xFFFF9CD0))
     val a = palette[Math.floorMod(h, palette.size)]
     val b = palette[Math.floorMod(h / 7, palette.size)]
-    Box(Modifier.fillMaxSize().background(c.surface2).background(Brush.linearGradient(listOf(a.copy(alpha = 0.55f), b.copy(alpha = 0.25f), c.surface2))),
+    Box(Modifier.fillMaxSize().background(c.surface2).background(Brush.linearGradient(listOf(a.copy(alpha = 0.55f), b.copy(alpha = 0.25f), c.surface2)))
+        .clearAndSetSemantics {},   // decorative: the row or player names the track
         contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = c.text.copy(alpha = 0.75f))
         else if (showLetter && seed.isNotBlank()) T(seed.trim().take(1).uppercase(), Tf.type.title, c.text.copy(alpha = 0.85f))
@@ -283,17 +285,29 @@ fun ListRow(
 /** Three bars that move while the row's track plays. */
 @Composable
 fun PlayingBars(playing: Boolean, color: Color = Tf.colors.accent) {
-    val t = rememberInfiniteTransition(label = "bars")
-    val phases = listOf(200, 500, 50).map { delay ->
-        t.animateFloat(0.35f, 1f, infiniteRepeatable(tween(450, delayMillis = 0), RepeatMode.Reverse, androidx.compose.animation.core.StartOffset(delay)), label = "b$delay")
-    }
-    Row(Modifier.height(14.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        for ((i, p) in phases.withIndex()) {
-            val f = if (playing) p.value else listOf(0.6f, 1f, 0.4f)[i]
-            Box(Modifier.width(3.dp).fillMaxHeight(f).clip(RoundedCornerShape(1.5.dp)).background(color))
+    // Read only while drawing: the bars move every frame without recomposing or measuring the row. They rest while the
+    // player covers the list (no frames spent on what nobody sees).
+    val phases = if (playing && !LocalCovered.current) {
+        val t = rememberInfiniteTransition(label = "bars")
+        listOf(200, 500, 50).map { delay ->
+            t.animateFloat(0.35f, 1f, infiniteRepeatable(tween(450), RepeatMode.Reverse, androidx.compose.animation.core.StartOffset(delay)), label = "b$delay")
         }
-    }
+    } else null
+    Box(Modifier.size(13.dp, 14.dp).drawBehind {
+        val w = 3.dp.toPx()
+        val r = androidx.compose.ui.geometry.CornerRadius(1.5.dp.toPx())
+        for (i in 0..2) {
+            val f = phases?.get(i)?.value ?: REST[i]
+            val h = size.height * f
+            drawRoundRect(color, androidx.compose.ui.geometry.Offset(i * (w + 2.dp.toPx()), size.height - h), androidx.compose.ui.geometry.Size(w, h), r)
+        }
+    })
 }
+
+private val REST = floatArrayOf(0.6f, 1f, 0.4f)
+
+/** True where the open player covers this content: decorative animations rest. */
+val LocalCovered = compositionLocalOf { false }
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {

@@ -19,11 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.runtime.mutableIntStateOf
 import android.os.SystemClock
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -123,6 +128,17 @@ fun WaveSeekbar(
         Palette(c.waveLow, c.waveMid, c.waveHigh, accent, restColor, accentOnly)
     }
     val text = c.text
+    // The two bitmaps (played and unplayed) are drawn on a background thread: a track change does not hold up a frame.
+    var box by remember { mutableStateOf(IntSize.Zero) }
+    val bars = shape == WaveShape.BARS && !compact
+    val images by produceState<Pair<ImageBitmap, ImageBitmap>?>(null, data, box, bars, compact, detail, palette) {
+        val d = data
+        val (w, h) = box
+        if (d == null || w <= 0 || h <= 0) { value = null; return@produceState }
+        value = withContext(Dispatchers.Default) {
+            render(d, w, h, density, played = true, bars, compact, detail, palette) to render(d, w, h, density, played = false, bars, compact, detail, palette)
+        }
+    }
 
     val gestures = if (compact) Modifier else Modifier
         .pointerInput(Unit) {
@@ -159,14 +175,9 @@ fun WaveSeekbar(
                 stateDescription = "${spoken(pos)} of ${spoken(durationMs)}"
                 setProgress { v -> seek(v.toLong()); true }
             }
+            .onSizeChanged { box = it; widthPx[0] = it.width }
             .graphicsLayer()   // its own layer: the playhead's redraws do not redraw the screen around it
             .drawWithCache {
-                val w = size.width.toInt().coerceAtLeast(1)
-                val h = size.height.toInt().coerceAtLeast(1)
-                widthPx[0] = w
-                val bars = shape == WaveShape.BARS && !compact
-                val played = data?.let { render(it, w, h, density, played = true, bars, compact, detail, palette) }
-                val rest = data?.let { render(it, w, h, density, played = false, bars, compact, detail, palette) }
                 val cy = if (compact) size.height else size.height / 2
                 val half = if (compact) size.height else size.height / 2 - 1.dp.toPx()
                 onDrawBehind {
@@ -175,9 +186,10 @@ fun WaveSeekbar(
                     val d = dur
                     val accent = accentNow
                     val x = dragX ?: if (d > 0) (p.toFloat() / d * size.width) else 0f
-                    if (played != null && rest != null) {
-                        clipRect(right = x) { drawImage(played) }
-                        clipRect(left = x) { drawImage(rest) }
+                    val img = images
+                    if (img != null) {
+                        clipRect(right = x) { drawImage(img.first) }
+                        clipRect(left = x) { drawImage(img.second) }
                     } else {   // not analysed yet: a quiet line with the progress on it
                         val y = if (compact) size.height - 1.dp.toPx() else cy
                         drawLine(palette.rest, Offset(0f, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round)
@@ -230,6 +242,17 @@ private fun CentredWave(
     }
     val text = c.text
     val path = remember { Path() }
+    // Bars and their colours for the whole track, worked out on a background thread (not in the frame that shows them).
+    var widthPx by remember { mutableIntStateOf(0) }
+    val barStep = (detail.bar * 1.5f + detail.gap * 1.6f) * density.density
+    val zoom by produceState<Pair<FloatArray, Array<Color>>?>(null, data, durationMs, widthPx, barStep, palette) {
+        val d = data
+        if (d == null || durationMs <= 0 || widthPx <= 0) { value = null; return@produceState }
+        value = withContext(Dispatchers.Default) {
+            val (amp, tone) = zoomedBars(d, durationMs, barStep * WINDOW_MS / widthPx)
+            amp to Array(tone.size) { palette.tone(tone[it]) }
+        }
+    }
 
     fun shown(): Float = scrub ?: now().toFloat()
     /** Scrubbing stops a second before the end: a flick to the end would otherwise skip to the next track. */
@@ -292,16 +315,14 @@ private fun CentredWave(
                 stateDescription = "${spoken(pos)} of ${spoken(durationMs)}"
                 setProgress { v -> seek(v.toLong()); true }
             }
+            .onSizeChanged { widthPx = it.width; msPerPx[0] = WINDOW_MS / it.width.coerceAtLeast(1) }
             .graphicsLayer()   // its own layer: its redraws do not redraw the screen around it
             .drawWithCache {
                 val w = size.width
                 val dp = density.density
                 val barW = detail.bar * 1.5f * dp
-                val step = barW + detail.gap * 1.6f * dp
-                msPerPx[0] = WINDOW_MS / w
+                val step = barStep
                 val d = dur
-                val bars = if (data != null && d > 0) zoomedBars(data, d, step * msPerPx[0]) else null
-                val colors = bars?.let { b -> Array(b.second.size) { palette.tone(b.second[it]) } }
                 val cx = w / 2
                 val cy = size.height / 2
                 val half = size.height / 2 - dp
@@ -312,6 +333,8 @@ private fun CentredWave(
                     val p = s ?: now().toFloat()
                     val accent = accentNow
                     val shift = p / msPerPx[0]   // the track's pixels left of the playhead
+                    val bars = zoom
+                    val colors = bars?.second
                     if (bars != null && colors != null && bars.first.isNotEmpty()) {
                         val amp = bars.first
                         val first = ((shift - cx) / step).toInt().coerceIn(0, amp.size - 1)
