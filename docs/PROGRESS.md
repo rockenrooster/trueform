@@ -380,8 +380,11 @@ Owner reports and what changed:
   on, every scroll frame also pays for Compose's accessibility bookkeeping (2.5–4.4 ms in the debug trace), and new
   rows are composed during the scroll. Swipes: frames during the drag 3–9 ms, during the glide 1–7 ms; the change
   itself (one heavy frame) now falls after the artwork stops.
-- The screen-off CPU measurement was spoiled (the phone was woken during the two minutes: 28.7 %); not recorded as a
-  result. The earlier attempt on the locked phone could not start playback from the background (see above).
+- **CPU while playing, screen off, 10-band EQ** (staging build, FLAC 16/44.1, playback started with the app in front,
+  then the screen off; 128 s counted, only stretches with the screen off at both ends): **4.76 % of one core**, no
+  underruns. The budget (under 3 %) is still missed on the 12R as on the Moto (release 6.1 %). Two earlier attempts
+  were spoiled by the phone being woken (one gave 28.7 %; not results). The EQ is kept and put back exactly by the
+  new debug commands `eq_keep` / `eq_back` (no `run-as` on a build that is not debuggable).
 - Slips this session: the first staging build lacked the debug receiver (its source folder was added to the wrong
   source set), so the first debug command crashed the app; the weather app that had been behind it came to the
   front, the script stopped, and its clean-up pressed Home over that app. The clean-up now presses Home only out of
