@@ -127,6 +127,7 @@ class DebugReceiver : BroadcastReceiver() {
             }
             "die" -> android.os.Process.killProcess(android.os.Process.myPid())   // process death, as the system does it
             "density" -> MainActivity.debugDensity = i.getStringExtra("v")?.toFloatOrNull()   // this app only; no value: normal
+            "font" -> MainActivity.debugFontScale = i.getStringExtra("v")?.toFloatOrNull()    // this app only; no value: normal
             "orient" -> MainActivity.current?.get()?.requestedOrientation = when (i.getStringExtra("v")) {   // this app only
                 "land" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 "port" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

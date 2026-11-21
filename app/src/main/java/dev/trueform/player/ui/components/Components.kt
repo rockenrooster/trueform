@@ -268,10 +268,11 @@ fun ListRow(
     val c = Tf.colors
     val h = LocalRowHeight.current
     Row(
-        modifier.fillMaxWidth().height(h)
+        // at least the row height; taller when large system text needs it (200 % font: the lines no longer clip)
+        modifier.fillMaxWidth().heightIn(min = h)
             .then(if (highlighted) Modifier.background(Brush.horizontalGradient(listOf(c.accent.copy(alpha = 0.10f), Color.Transparent))) else Modifier)
             .tfClickable(onLongClick = onLongClick, onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

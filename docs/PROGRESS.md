@@ -500,3 +500,14 @@ left adb at 00:16):
   (it skipped them, "not repeatable across seeks") and that the dither is triangular (mean 0, variance 1/6).
   Verified on the Moto: a range from the soak's resume point and one from an odd byte inside a sample equal the
   whole render from there, byte for byte.
+- **Cold start**, staging build (built like a release), compiled, Moto: 292 ms to the first frame (`am start -W`;
+  budget 700 ms). The release build had not been measured on the Moto (M11: debug build 1.66–1.74 s).
+- **200 % font pass** (11-testing-hardening.md task 9), in this app only (new debug command `font`; the phone's own
+  font setting is untouched): the player and Settings hold (lines wrap or end in "…"). Song and folder rows had a
+  fixed height: the second line lost its descenders ("Mixed Baq") and rows touched. Rows now take at least their
+  height and grow with the text. The mini player is a 64 dp bar: its two lines follow the system text up to 130 %
+  (the open player shows them at full size). Checked again at 200 %: rows readable, nothing clipped.
+- The debug overrides (`density`, `font`) recreated the app's whole content when turned on or off, so the screen fell
+  back to the library root; a scripted Back then closed the app and the weather app behind it came forward, and one
+  scripted tap landed on its first-run screen (on its logo: nothing changed; the phone was put back at the launcher).
+  The overrides now keep the app's state; the scripts tap only what the screen dump shows.

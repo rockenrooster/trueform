@@ -278,9 +278,13 @@ fun MiniPlayer(ui: PlayerUi, onExpand: () -> Unit, modifier: Modifier = Modifier
     fun MiniRow(track: Track, m: Modifier) = Row(m.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         ArtImage(ArtKey.Track(track.id), track.album.ifBlank { track.displayTitle }, Modifier.size(44.dp))
-        Column(Modifier.weight(1f)) {
-            T(track.displayTitle, Tf.type.rowTitle.copy(fontSize = 15.sp, lineHeight = 20.sp))
-            T(track.displayArtist, Tf.type.caption, c.textSecondary)
+        // a 64 dp bar: its two lines follow large system text up to 130 % (the open player shows them at full size)
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
+            androidx.compose.ui.unit.Density(density.density, density.fontScale.coerceAtMost(1.3f))) {
+            Column(Modifier.weight(1f)) {
+                T(track.displayTitle, Tf.type.rowTitle.copy(fontSize = 15.sp, lineHeight = 20.sp))
+                T(track.displayArtist, Tf.type.caption, c.textSecondary)
+            }
         }
     }
     Box(

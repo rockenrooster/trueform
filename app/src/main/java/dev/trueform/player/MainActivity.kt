@@ -38,10 +38,14 @@ class MainActivity : ComponentActivity() {
             val content = @androidx.compose.runtime.Composable {
                 AppRoot(g, needsSetup, onSetupDone = { needsSetup = false }, requestPermission = { permission.launch(audioPermission()) })
             }
+            // always the same provider, so turning a debug override on or off keeps the app's state (a branch here
+            // recreated the whole content: the screen fell back to the library root)
             val dd = debugDensity
-            if (dd == null) content()
-            else androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dd, 1f), content = content)
+            val fs = debugFontScale
+            val d = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
+                if (dd == null && fs == null) d else androidx.compose.ui.unit.Density(dd ?: d.density, fs ?: d.fontScale),
+                content = content)
         }
         handleOpenWith(intent)
         // The Cast framework has to exist while this activity starts, or it misses the moment to resume a session the
@@ -88,6 +92,9 @@ class MainActivity : ComponentActivity() {
 
         /** The debug build's "density" command: draws this app at another density, to see the tablet layout on a phone. */
         var debugDensity by mutableStateOf<Float?>(null)
+
+        /** The debug build's "font" command: this app's text at another scale (200 % for the plan's pass), not the phone's. */
+        var debugFontScale by mutableStateOf<Float?>(null)
     }
 
     private fun rootsMissing(): Boolean = g.library.scanRoots().isEmpty()
