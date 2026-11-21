@@ -118,7 +118,6 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
     val swipe = remember { Animatable(0f) }
 
     Column(Modifier.fillMaxSize()
-        .then(if (folderId != null) Modifier.edgeSwipeUp(swipe, scope) { actions.back() } else Modifier)
         .graphicsLayer { translationX = swipe.value }
         .statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (folderId != null) 4.dp else 16.dp, end = 4.dp),
@@ -136,7 +135,7 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
         }
         Tabs(tabs.map { TAB_LABELS.getValue(it) }, tabs.indexOf(tab)) { actions.tab(it) }
         if (scan.phase != Scanner.Phase.IDLE) ScanLine(scan)
-        Box(Modifier.weight(1f)) {
+        Box(Modifier.weight(1f).then(if (folderId != null && tab == "folders") Modifier.swipeUp(swipe, scope) { actions.back() } else Modifier)) {
             when (tab) {
                 "folders" -> FolderContent(effectiveFolder, roots, ui, actions)
                 "albums" -> AlbumsTab(actions)
@@ -149,17 +148,16 @@ fun LibraryScreen(nav: Nav, folderId: Long?, ui: PlayerUi, actions: UiActions) {
 }
 
 /**
- * Swipe in from the left edge (the finger moving right) to go up one folder: the folder follows the finger, then goes
- * past a third of the width or on a fling, else springs back. The edge strip is claimed before the rows see the touch,
- * so song rows keep their own swipes (right: play next, left: add to queue) and a vertical move still scrolls.
+ * In the folder browser, a swipe to the right (anywhere in the list, as in Poweramp; the owner's choice) goes up one
+ * folder: the folder follows the finger, then goes past a third of the width or on a fling, else springs back. A
+ * rightward drag is claimed before the rows see it, so song rows keep only their swipe left (add to queue; "play
+ * next" is in their long-press menu), and a vertical move still scrolls.
  */
-private fun Modifier.edgeSwipeUp(offset: Animatable<Float, AnimationVector1D>, scope: CoroutineScope, onUp: () -> Unit): Modifier =
+private fun Modifier.swipeUp(offset: Animatable<Float, AnimationVector1D>, scope: CoroutineScope, onUp: () -> Unit): Modifier =
     pointerInput(Unit) {
-        val edge = 40.dp.toPx()
         val slop = viewConfiguration.touchSlop
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            if (down.position.x > edge) return@awaitEachGesture
             val velocity = VelocityTracker()
             var dragging = false
             while (true) {
@@ -168,6 +166,7 @@ private fun Modifier.edgeSwipeUp(offset: Animatable<Float, AnimationVector1D>, s
                 val dx = change.position.x - down.position.x
                 if (!dragging) {
                     if (abs(change.position.y - down.position.y) > slop && abs(change.position.y - down.position.y) >= abs(dx)) return@awaitEachGesture
+                    if (dx < -slop) return@awaitEachGesture   // leftward: the row's own swipe (add to queue)
                     if (dx <= slop) continue
                     dragging = true
                 }
@@ -231,7 +230,8 @@ private fun FolderContent(folderId: Long?, roots: List<Folder>, ui: PlayerUi, ac
             ) { actions.open(Dest.Folder(sub.id)) }
         }
         items(ch.tracks, key = { "t${it.id}" }, contentType = { "track" }) { t ->
-            SwipeRow(onPlayNext = { g.queue.insertNext(listOf(t.id)) }, onQueue = { g.queue.append(listOf(t.id)) }) {
+            // in the folder browser a swipe right goes up a folder (swipeUp): the rows keep only their swipe left
+            SwipeRow(onPlayNext = null, onQueue = { g.queue.append(listOf(t.id)) }) {
                 TrackRow(t, t.id == currentTrackId, ui, onLongClick = { actions.sheet(SheetKind.TrackActions(t)) }) {
                     playFromFolder(g, scope, ch, t)
                 }
@@ -264,9 +264,9 @@ fun TrackRow(t: Track, current: Boolean, ui: PlayerUi, showNumber: Boolean = fal
     )
 }
 
-/** Swipe right: play next; left: add to queue (docs/plan/04-ui-ux.md). */
+/** Swipe right: play next (none when [onPlayNext] is null, as in the folder browser); left: add to queue (04-ui-ux.md). */
 @Composable
-fun SwipeRow(onPlayNext: () -> Unit, onQueue: () -> Unit, content: @Composable () -> Unit) {
+fun SwipeRow(onPlayNext: (() -> Unit)?, onQueue: () -> Unit, content: @Composable () -> Unit) {
     if (!dev.trueform.player.ui.components.LocalSwipeToQueue.current) { content(); return }
     val c = Tf.colors
     val scope = rememberCoroutineScope()
@@ -283,14 +283,19 @@ fun SwipeRow(onPlayNext: () -> Unit, onQueue: () -> Unit, content: @Composable (
                 T(if (offset.value > 0) "Play next" else "Add to queue", Tf.type.label, if (offset.value > 0) c.accent else c.text)
             }
         }
-        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.background(c.bg)
-            .draggable(rememberDraggableState { d -> scope.launch { offset.snapTo((offset.value + d).coerceIn(-widthPx * 0.5f, widthPx * 0.5f)) } },
+        // the row's own background only while it is moved off its place (it covers the action beneath); at rest it
+        // would paint a second full-width layer under every row of the list
+        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.then(if (offset.value != 0f) Modifier.background(c.bg) else Modifier)
+            .draggable(rememberDraggableState { d ->
+                val right = if (onPlayNext != null) widthPx * 0.5f else 0f
+                scope.launch { offset.snapTo((offset.value + d).coerceIn(-widthPx * 0.5f, right)) }
+            },
                 Orientation.Horizontal,
                 onDragStopped = {
                     val v = offset.value
                     if (abs(v) > widthPx * 0.25f) {
                         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        if (v > 0) onPlayNext() else onQueue()
+                        if (v > 0) onPlayNext?.invoke() else onQueue()
                     }
                     offset.animateTo(0f, tween(180))
                 })) { content() }

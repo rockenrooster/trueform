@@ -99,6 +99,8 @@ fun WaveSeekbar(
     seekWhileDragging: Boolean = false,
     compact: Boolean = false,
     centred: Boolean = false,
+    /** Drawn at this opacity (the mini player's background strip): applied to each drawing, no offscreen layer. */
+    faint: Float = 1f,
 ) {
     if (centred && !compact) {
         CentredWave(data, durationMs, position, playing, onSeek, modifier, height, detail, shape, colorMode, accent, seekWhileDragging)
@@ -191,12 +193,12 @@ fun WaveSeekbar(
                     val x = dragX ?: if (d > 0) (p.toFloat() / d * size.width) else 0f
                     val img = images
                     if (img != null) {
-                        clipRect(right = x) { drawImage(img.first) }
-                        clipRect(left = x) { drawImage(img.second) }
+                        clipRect(right = x) { drawImage(img.first, alpha = faint) }
+                        clipRect(left = x) { drawImage(img.second, alpha = faint) }
                     } else {   // not analysed yet: a quiet line with the progress on it
                         val y = if (compact) size.height - 1.dp.toPx() else cy
-                        drawLine(palette.rest, Offset(0f, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round)
-                        drawLine(accent, Offset(0f, y), Offset(x, y), 2.dp.toPx(), StrokeCap.Round)
+                        drawLine(palette.rest, Offset(0f, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round, alpha = faint)
+                        drawLine(accent, Offset(0f, y), Offset(x, y), 2.dp.toPx(), StrokeCap.Round, alpha = faint)
                     }
                     if (!compact) {
                         val px = x.coerceIn(1.5.dp.toPx(), size.width - 1.5.dp.toPx())

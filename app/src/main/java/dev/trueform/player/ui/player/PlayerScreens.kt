@@ -292,7 +292,7 @@ fun MiniPlayer(ui: PlayerUi, onExpand: () -> Unit, modifier: Modifier = Modifier
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.outline))
         key(t.id) {   // per track: never the previous track's bitmaps while the new ones are drawn
-            WaveSeekbar(wave, ui.durationMs, ui::position, ui.isPlaying, {}, Modifier.fillMaxSize().alpha(0.38f), height = 64.dp, compact = true)
+            WaveSeekbar(wave, ui.durationMs, ui::position, ui.isPlaying, {}, Modifier.fillMaxSize(), height = 64.dp, compact = true, faint = 0.38f)
         }
         Row(Modifier.fillMaxSize().padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f).clipToBounds().then(with(swipe) { Modifier.measure(16.dp, density) })) {
