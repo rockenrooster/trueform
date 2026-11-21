@@ -20,7 +20,10 @@ On the release side (Raveform and Glowtide already do all of this except the ver
 - A public GitHub repository with one release per build: tag `build-<commit count>`, assets `<app>.apk` and
   `<app>.apk.sha256` (`sha256sum` format: `<hex>  <app>.apk`).
 - Every release signed with the same release key. Android refuses an update signed with another key, and the app
-  checks it before asking.
+  checks it before asking. A pipeline that signs with a key made per run (Glowtide's, until the owner runs its
+  release-key script) can never update in place: make the stable key first (Trueform: `scripts\release-key.ps1`, the
+  keystore as base64 in the repository's secrets). A copy installed from a per-run key has to be uninstalled once
+  (its data goes with it) before a properly signed build can be installed.
 - **`versionCode` = the build number** (the commit count). Android only knows "newer" by the version code; the
   checks below refuse an APK that is not newer. Trueform: `versionCode = if (buildNumber > 0) buildNumber else 1`.
   Raveform and Glowtide still have `versionCode 1` in `android/app/build.gradle`: change it to the number they
@@ -32,6 +35,8 @@ In the app:
 
 - Manifest: `<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />` (INTERNET is already
   there) and, inside `<application>`, `<receiver android:name=".ApkInstallReceiver" android:exported="false" />`.
+  Google Play restricts that permission: an app that also ships on Play declares it in the GitHub build only (a
+  manifest in that variant's source set, or `tools:node="remove"` in the Play variant's).
 - No storage permission and no FileProvider: the APK goes to the app's cache and into a `PackageInstaller` session.
 
 ## The flow, step by step
