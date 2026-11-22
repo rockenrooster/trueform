@@ -543,3 +543,15 @@ left adb at 00:16):
   carries little at those levels); from 26 kHz up it is below -127 dB. libsoxr is not needed (the plan's condition
   read as audible aliasing); "Very high" is there for anyone who wants it. With abrupt tone starts the filter rang:
   one sample reached 1.04 at High for a -1 dBFS 22.6 kHz tone, as any steep filter would on a step.
+
+Left open after this session (21–22 November):
+
+- **12R**: the scroll after the drawing cuts is not measured. The phone left adb at 00:16 on the 21st, came back
+  11:14–12:00 while the owner used it, and did not return through 08:45 on the 22nd (a script waited for it).
+- **Both phones still have the test stay-awake settings** (`scripts\awake.ps1 -On`, set at the owner's request for
+  testing; the originals are in `captures\awake-original.json`): the 12R stays on while charging on any charger with
+  a 30-minute timeout (originally USB only, 5 minutes); the Moto likewise (originally never, 60 s; left on for the
+  other sessions' runs). Restore with `scripts\awake.ps1 -Off` once a phone is back on adb.
+- The real Chromecast soak and the Wi-Fi blip (the owner's receivers, daytime), Bluetooth and Android Auto (the owner's
+  hardware; Android Auto's developer settings), the 12R's screen-off CPU (needs the phone locked), TalkBack (a
+  phone-wide setting), split screen and storage removal.
