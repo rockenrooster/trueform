@@ -547,11 +547,13 @@ left adb at 00:16):
 Left open after this session (21–22 November):
 
 - **12R**: the scroll after the drawing cuts is not measured. The phone left adb at 00:16 on the 21st, came back
-  11:14–12:00 while the owner used it, and did not return through 08:45 on the 22nd (a script waited for it).
-- **Both phones still have the test stay-awake settings** (`scripts\awake.ps1 -On`, set at the owner's request for
-  testing; the originals are in `captures\awake-original.json`): the 12R stays on while charging on any charger with
-  a 30-minute timeout (originally USB only, 5 minutes); the Moto likewise (originally never, 60 s; left on for the
-  other sessions' runs). Restore with `scripts\awake.ps1 -Off` once a phone is back on adb.
+  11:14–12:00 while the owner used it, and did not return through 08:45 on the 22nd (a script waited for it). It
+  came back on 24 November at 17:57: the waiting script's three tries failed within 8 minutes, and it had swallowed
+  the error. It now logs errors and tries again when the phone returns.
+- **The Moto still has the test stay-awake settings** (`scripts\awake.ps1 -On`, set at the owner's request for
+  testing; the originals are in `captures\awake-original.json`): stays on while charging, 30-minute timeout
+  (originally never, 60 s; left on for the other sessions' runs). Restore with `scripts\awake.ps1 -Off -Devices moto`
+  once it is back on adb. The 12R's were restored on 24 November at 18:05 (USB only, 5 minutes).
 - The real Chromecast soak and the Wi-Fi blip (the owner's receivers, daytime), Bluetooth and Android Auto (the owner's
   hardware; Android Auto's developer settings), the 12R's screen-off CPU (needs the phone locked), TalkBack (a
   phone-wide setting), split screen and storage removal.
