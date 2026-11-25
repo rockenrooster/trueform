@@ -34,6 +34,10 @@ Other Claude sessions use the same phones at the same time.
 6. Development uses the application id `dev.trueform.player.debug`. Never install over or stop
    `dev.trueform.player` (the owner's daily copy) unless asked.
 7. Device serials stay in the untracked `scripts\devices.local.ps1`.
+8. Since 25 November the owner wants tests run on an emulator, not the phones, until they say otherwise: the AVD
+   `Trueform_API35` (Pixel 7, API 35 x86_64; its ARM translation runs the arm64-only APK), headless, `-cores 2`, on
+   its own port; shut it down when finished (`adb -s emulator-<port> emu kill`). Leave other sessions' emulators
+   alone. Frame times still need a phone.
 
 ## UI rules (from the owner)
 

@@ -549,7 +549,8 @@ Left open after this session (21–22 November):
 - **12R**: the scroll after the drawing cuts is not measured. The phone left adb at 00:16 on the 21st, came back
   11:14–12:00 while the owner used it, and did not return through 08:45 on the 22nd (a script waited for it). It
   came back on 24 November at 17:57: the waiting script's three tries failed within 8 minutes, and it had swallowed
-  the error. It now logs errors and tries again when the phone returns.
+  the error. On 25 November the owner said to test on emulators instead, so the try was dropped; frame times need a
+  real phone, so this stays unmeasured until the owner says the phones are back.
 - **The Moto still has the test stay-awake settings** (`scripts\awake.ps1 -On`, set at the owner's request for
   testing; the originals are in `captures\awake-original.json`): stays on while charging, 30-minute timeout
   (originally never, 60 s; left on for the other sessions' runs). Restore with `scripts\awake.ps1 -Off -Devices moto`
@@ -571,4 +572,9 @@ Left open after this session (21–22 November):
 - Checked on the PC only (both phones off adb): three game soundtracks decoded with ffmpeg through the same columns,
   bytes and pooling (`captures/wave_preview.py`, image `captures/waveform-heights-before-after.png`). The two
   compressed electronic tracks now dip at their breakdowns where the old bars were level; the orchestral one has a
-  low opening and a tall climax. To look at on a phone.
+  low opening and a tall climax.
+- Released as build 42 (25 November). Then checked on an emulator (Pixel 7 profile, API 35, the staging build;
+  `captures/emu-wave-*.png`): in the centred view the orchestral track's quiet passages are short stubs beside
+  full-height loud ones; the electronic track's whole-track view shows its ramp-in and both breakdown dips, as on the
+  PC. Under the emulator's ARM translation the analysis ran at about four times real time, so the bars filled in over
+  about a minute.
