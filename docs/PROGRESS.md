@@ -555,3 +555,18 @@ Left open after this session (21–22 November):
 - The real Chromecast soak and the Wi-Fi blip (the owner's receivers, daytime), Bluetooth and Android Auto (the owner's
   hardware; Android Auto's developer settings), the 12R's screen-off CPU (needs the phone locked), TalkBack (a
   phone-wide setting), split screen and storage removal.
+
+## Follow-up — waveform heights (2026-11-25)
+
+- **Seek bar "too flat during a normal song with quiet and loud parts"** (the owner). Bar height was the absolute RMS
+  over a 48 dB range with a 1.4 curve, blended 30 % with the peak: a verse 6 dB under the chorus stood at 84 % of the
+  chorus's height, and mastered tracks peak near full scale in quiet and loud parts alike. Now the height is the RMS
+  as amplitude against the track's own loud level (the RMS that 98 % of its columns stay at or under, at least
+  -30 dB so a silent track stays flat): the chorus at full height, a verse 6 dB under it at half, an intro 18 dB under
+  it at an eighth. The peak is no longer drawn. Heights are worked out when drawing, so stored waveforms are not
+  analysed again; on a track's first play the bars rescale for a second or two while the analysis reaches its loud
+  parts. `WaveformTest` checks the levels.
+- Checked on the PC only (both phones off adb): three game soundtracks decoded with ffmpeg through the same columns,
+  bytes and pooling (`captures/wave_preview.py`, image `captures/waveform-heights-before-after.png`). The two
+  compressed electronic tracks now dip at their breakdowns where the old bars were level; the orchestral one has a
+  low opening and a tall climax. To look at on a phone.

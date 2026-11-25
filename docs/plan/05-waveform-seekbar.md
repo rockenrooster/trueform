@@ -61,8 +61,12 @@ style settings, `onSeek(ms)`.
 - Bars: `count = floor(width / (barWidth + gap))`. Pool columns into bars: level = mean RMS of the pooled columns,
   tip = max peak, shares = mean shares. Styles (setting "Waveform detail"): Fine 2 + 1 dp (default), Medium
   3 + 1.5 dp, Bold 4 + 2 dp.
-- Height: `h = clamp(((rmsDb + 48) / 48) ^ 1.4, 0.04, 1)` of the half-height; the peak adds a thinner "tip" above
-  the body at 35% alpha (`hTip` from `peakDb` with the same curve). Curve constants live in `WaveformTuning`.
+- Height: the RMS as amplitude against the track's own loud level, `h = clamp(10 ^ ((rmsDb − loud) / 20), 0.04, 1)`
+  of the half-height; `loud` is the RMS that 98% of the track's columns stay at or under (at least −30 dB, so a
+  silent track stays flat). A verse 6 dB under the chorus stands at half its height. The peak is not drawn: mastered
+  tracks peak near full scale in quiet and loud parts alike. Constants live in `WaveformTuning` (`GAMMA` 1 = plain
+  amplitude). Changed 2026-11-25 (the owner: "too flat during a normal song with quiet and loud parts"); before, the
+  absolute `((rmsDb + 48) / 48) ^ 1.4` blended 30% with the peak drew that verse at 84% of the chorus.
 - Shape (setting "Waveform shape"): **Mirrored** (default): the bar grows up from a centre line at 62% of the
   height, with a reflection below at 60% of its height and 45% alpha. **Bars**: from the bottom edge.
 - Colour (setting "Waveform colour"): **Spectral** (default): raise each share to the power `SHARE_CONTRAST`

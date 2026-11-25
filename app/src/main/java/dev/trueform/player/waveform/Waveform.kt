@@ -30,9 +30,15 @@ object WaveformTuning {
     const val W_MID = 1.6
     const val W_HIGH = 3.0
     const val SHARE_CONTRAST = 2.2f
-    /** Bar height: ((rmsDb + RANGE) / RANGE) ^ CURVE of the half height, at least MIN. */
-    const val RANGE_DB = 48f
-    const val CURVE = 1.4f
+    /**
+     * Bar height: the RMS as amplitude against the track's loud level, (10 ^ ((rmsDb - loud) / 20)) ^ GAMMA of the half
+     * height, within MIN..1: a verse 6 dB under the chorus stands at half its height. 1 = plain amplitude; lower is flatter.
+     */
+    const val GAMMA = 1f
+    /** The track's loud level: the RMS this share of its columns stay at or under (one loud moment does not set it). */
+    const val LOUD_SHARE = 0.98f
+    /** A silent or very quiet track is not scaled up past this level (dB). */
+    const val LOUD_FLOOR_DB = -30f
     const val MIN = 0.04f
 }
 
@@ -47,6 +53,13 @@ class WaveformData(val bytes: ByteArray, val filled: Int = bytes.size / 5) {
     fun lo(i: Int) = (bytes[i * 5 + 2].toInt() and 0xff) / 255f
     fun mid(i: Int) = (bytes[i * 5 + 3].toInt() and 0xff) / 255f
     fun hi(i: Int) = (bytes[i * 5 + 4].toInt() and 0xff) / 255f
+
+    /** The track's loud level (dB) over the analysed columns: bar heights are measured against it ([WaveformRepo.height]). */
+    fun loudDb(): Float {
+        if (filled == 0) return WaveformTuning.LOUD_FLOOR_DB
+        val r = FloatArray(filled) { rmsDb(it) }.apply { sort() }
+        return max(r[((filled - 1) * WaveformTuning.LOUD_SHARE).toInt()], WaveformTuning.LOUD_FLOOR_DB)
+    }
 
     fun toBlob(): ByteArray = ByteBuffer.allocate(10 + bytes.size).put(MAGIC).putShort(VERSION.toShort())
         .putInt(columns).put(bytes).array()
@@ -268,9 +281,9 @@ class WaveformRepo(private val db: Db, private val library: LibraryRepo, private
         synchronized(this) { flows.values.forEach { it.value = null } }
     }
 
-    /** Bar level for drawing: ((rmsDb + R) / R) ^ curve, at least MIN. */
+    /** Bar level for drawing ([WaveformTuning]): the RMS [db] as amplitude against the track's [loudDb]. */
     companion object {
-        fun height(db: Float): Float =
-            ((db + WaveformTuning.RANGE_DB) / WaveformTuning.RANGE_DB).coerceIn(0f, 1f).pow(WaveformTuning.CURVE).coerceAtLeast(WaveformTuning.MIN)
+        fun height(db: Float, loudDb: Float): Float =
+            10f.pow((db - loudDb) / 20f * WaveformTuning.GAMMA).coerceIn(WaveformTuning.MIN, 1f)
     }
 }

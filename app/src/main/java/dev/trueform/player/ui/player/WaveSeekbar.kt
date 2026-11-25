@@ -420,6 +420,7 @@ internal fun zoomedBars(d: WaveformData, durationMs: Long, barMs: Float): Pair<F
     val cols = d.columns
     val n = (durationMs / barMs).toInt().coerceAtLeast(1)
     val perMs = cols.toDouble() / durationMs
+    val loud = d.loudDb()
     val amp = FloatArray(n)
     val tone = FloatArray(n)
     var k = 0
@@ -427,18 +428,21 @@ internal fun zoomedBars(d: WaveformData, durationMs: Long, barMs: Float): Pair<F
         val c0 = (i * barMs * perMs).toInt().coerceIn(0, cols - 1)
         val c1 = max(c0 + 1, ((i + 1) * barMs * perMs).toInt().coerceAtMost(cols))
         if (c1 > d.filled) break
-        pool(d, c0, c1, amp, tone, i)
+        pool(d, c0, c1, loud, amp, tone, i)
         k = i + 1
     }
     return blur(amp, k, 1) to blur(tone, k, 5)
 }
 
-/** Columns [c0, c1) into one bar: mostly RMS (what you hear), some peak (so drums and attacks show); the tone centroid. */
-private fun pool(d: WaveformData, c0: Int, c1: Int, amp: FloatArray, tone: FloatArray, i: Int) {
-    var rms = 0f; var peak = -96f; var lo = 0f; var mi = 0f; var hi = 0f
-    for (j in c0 until c1) { rms += d.rmsDb(j); peak = max(peak, d.peakDb(j)); lo += d.lo(j); mi += d.mid(j); hi += d.hi(j) }
+/**
+ * Columns [c0, c1) into one bar: the RMS (what you hear) against the track's [loud] level, and the tone centroid. No
+ * peak: mastered tracks peak near full scale in quiet and loud parts alike, so it flattened the bars.
+ */
+private fun pool(d: WaveformData, c0: Int, c1: Int, loud: Float, amp: FloatArray, tone: FloatArray, i: Int) {
+    var rms = 0f; var lo = 0f; var mi = 0f; var hi = 0f
+    for (j in c0 until c1) { rms += d.rmsDb(j); lo += d.lo(j); mi += d.mid(j); hi += d.hi(j) }
     val m = (c1 - c0).toFloat()
-    amp[i] = 0.7f * WaveformRepo.height(rms / m) + 0.3f * WaveformRepo.height(peak)
+    amp[i] = WaveformRepo.height(rms / m, loud)
     val s = lo + mi + hi
     val centroid = if (s > 0f) (0.5f * mi + hi) / s else 0.5f
     tone[i] = (0.5f + (centroid - 0.5f) * 1.5f).coerceIn(0f, 1f)   // music mostly leans low: widen the spread
@@ -457,6 +461,7 @@ private class Palette(val low: Color, val mid: Color, val high: Color, val accen
 /** Loudness (0..1) and tone (0..1) at [n] points across the track, lightly smoothed; fewer when analysis is partial. */
 private fun points(d: WaveformData, n: Int, smooth: Int): Pair<FloatArray, FloatArray> {
     val cols = d.columns
+    val loud = d.loudDb()
     val amp = FloatArray(n)
     val tone = FloatArray(n)
     var k = 0
@@ -464,7 +469,7 @@ private fun points(d: WaveformData, n: Int, smooth: Int): Pair<FloatArray, Float
         val c0 = (i.toLong() * cols / n).toInt()
         val c1 = max(c0 + 1, ((i + 1).toLong() * cols / n).toInt())
         if (c1 > d.filled) break
-        pool(d, c0, c1, amp, tone, i)
+        pool(d, c0, c1, loud, amp, tone, i)
         k = i + 1
     }
     return blur(amp, k, smooth) to blur(tone, k, smooth + 4)
